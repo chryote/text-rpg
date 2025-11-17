@@ -62,6 +62,47 @@ class MemoryComponent(Component):
     def recall(self, key, default=None):
         return self.short.get(key, self.long.get(key, default))
 
+    def rename_memory_key(memory_component, old_key, new_key):
+        """
+        Renames a key in a MemoryComponent, preserving its value
+        and storage type (short-term vs. long-term).
+
+        Args:
+            memory_component (MemoryComponent): The entity's memory component.
+            old_key (str): The name of the memory key to rename.
+            new_key (str): The new name for the memory key.
+
+        Returns:
+            bool: True if the rename was successful, False if the old_key was not found.
+        """
+        # 1. Recall the value from the old key
+        # We can't use mem.recall() because we need to know *where* it was stored
+        value = None
+        is_long_term = False
+
+        if old_key in memory_component.short:
+            value = memory_component.short[old_key]
+            is_long_term = False
+        elif old_key in memory_component.long:
+            value = memory_component.long[old_key]
+            is_long_term = True
+
+        # 2. If the memory exists, proceed
+        if value is not None:
+
+            # 3. Remember the value with the new key, preserving its storage type
+            memory_component.remember(new_key, value, long_term=is_long_term)
+
+            # 4. Delete the old key from its original dictionary
+            if is_long_term:
+                del memory_component.long[old_key]
+            else:
+                del memory_component.short[old_key]
+
+            return True  # Operation successful
+
+        return False  # Old key not found
+
     def update(self, world):
         # by default, short-term memory decays each tick (caller can override)
         self.short.clear()
