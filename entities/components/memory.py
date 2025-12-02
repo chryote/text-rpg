@@ -57,10 +57,14 @@ class MemoryComponent(Component):
         if long_term:
             self.long[key] = value
         else:
-            self.short[key] = value
+            # TTL = 2 ticks
+            self.short[key] = (value, 2)
 
     def recall(self, key, default=None):
-        return self.short.get(key, self.long.get(key, default))
+        if key in self.short:
+            return self.short[key][0]  # return the value only
+        return self.long.get(key, default)
+        # return self.short.get(key, self.long.get(key, default))
 
     def rename_memory_key(memory_component, old_key, new_key):
         """
@@ -104,6 +108,16 @@ class MemoryComponent(Component):
         return False  # Old key not found
 
     def update(self, world):
-        # by default, short-term memory decays each tick (caller can override)
-        self.short.clear()
+        # Decrement TTL
+        expired = []
+        for key, (value, ttl) in self.short.items():
+            ttl -= 1
+            if ttl <= 0:
+                expired.append(key)
+            else:
+                self.short[key] = (value, ttl)
+
+        # Remove expired keys
+        for key in expired:
+            del self.short[key]
 

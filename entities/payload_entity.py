@@ -31,6 +31,7 @@ class PayloadComponent:
         agent = getattr(tile, "agent", None)
         if agent:
             if "supplies" in self.payload_data:
+                print ("[DEBUG:PAYLOAD] UPDATING SUPPLIES BY: ]", self.payload_data["supplies"])
                 agent.add_supplies(self.payload_data["supplies"] * self.payload_power, 1)
 
             if "wealth" in self.payload_data:
@@ -47,7 +48,7 @@ class PayloadComponent:
             print ("[DEBUG:PAYLOAD] RELATIONSHIP:", rel, tile, self.sender_entity)
             if rel and self.sender_id:
                 delta = self.payload_data.get("relationship_mod", 0)
-                print("[DEBUG:PAYLOAD] DEBUG RELATIONSHIP DELTA:", rel, tile)
+                print("[DEBUG:PAYLOAD] DEBUG RELATIONSHIP DELTA:", rel, tile, self.payload_power)
                 rel.modify(self.sender_id, int(delta * self.payload_power))
 
         # --- Tags / Flavor ---

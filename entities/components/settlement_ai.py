@@ -45,7 +45,8 @@ class SettlementAIComponent(Component):
                 if emo:
                     emo.mod("fear", 0.2)
                 if action:
-                    action.add_supplies(1)  # small stockpile
+                    action.trigger_event("do_nothing")
+                    # action.add_supplies(1)  # small stockpile
                 # also set a fearful tag for narrative
                 entity.tile.add_tag("under_threat")
                 return bh.Status.SUCCESS
@@ -74,16 +75,18 @@ class SettlementAIComponent(Component):
                 # If we have a local partner that recently asked, try to trade/ask
                 # If supplies extremely low, request aid; else try small internal increase
 
-                if econ["supplies"] < 2:
-                    action.trigger_event("trade_mission")
+                # if econ["supplies"] < 2:
+                #     action.trigger_event("trade_mission")
 
-                if econ["supplies"] < econ["population"] * 0.4:
+                # if econ["supplies"] < econ["population"] * 0.4:
+                if econ["supplies"] < 2:
+                    print("[DEBUG:DIPLOMACY] EMERGENCY SHORTAGE TRIGGERED")
                     # emergency: request aid from nearest partner
                     if dip:
                         dip.request_aid(entity.tile.index.world if getattr(entity.tile, "index", None) else None,
                                         reason="emergency_shortage")
-                    if action:
-                        action.increase_supplies(amount=5)
+                    # if action:
+                    #     action.increase_supplies(amount=5)
                     return bh.Status.SUCCESS
 
                 # If trend declining, attempt trade mission (uses event system)
@@ -95,7 +98,8 @@ class SettlementAIComponent(Component):
 
                 # fallback small harvest push
                 if action:
-                    action.add_supplies(1)
+                    action.trigger_event("do_nothing")
+                    # action.add_supplies(1)
                 return bh.Status.SUCCESS
 
         class CheckProsperity(bh.Node):
@@ -115,7 +119,8 @@ class SettlementAIComponent(Component):
                 if emo:
                     emo.mod("pride", 0.15)
                 if action:
-                    action.trigger_event("festival")
+                    action.trigger_event("do_nothing")
+                    # action.trigger_event("festival")
                 return bh.Status.SUCCESS
 
         class Idle(bh.Node):
@@ -153,6 +158,9 @@ class SettlementAIComponent(Component):
         if not econ:
             return
 
+        if (tile.x, tile.y) == (8,1):
+            print ("[DEBUG:ECONOMY] INSPECTING (8,1) : ", econ["supplies"])
+
         # ensure subcomponents exist
         mem = self.entity.get("memory")
         emo = self.entity.get("emotion")
@@ -185,16 +193,20 @@ class SettlementAIComponent(Component):
             # simple heuristic: if we have high supplies and recently saw aid request, give a little
             for k, v in list(mem.short.items()):
                 if k.startswith("aid_request_from_"):
-                    if econ.get("supplies", 0) > econ.get("population", 1) * 1.5:
+                    # if econ.get("supplies", 0) > econ.get("population", 1) * 1.5:
+                    if econ.get("supplies", 0) > 2:
+                        print("[DEBUG:DIPLOMACY] CHECKING FOR AID REQUEST", k)
                         # find requester tile coordinates in v and offer aid
-                        coords = v.get("from")
+                        v = mem.recall(k)
+                        coords = v["from"]
+
                         if coords:
                             rx, ry = coords
                             try:
                                 requester_tile = tile.index.world[ry][rx]
                                 dip.offer_aid(tile.index.world, requester_tile, amount_supplies=3)
                                 # reduce trust? increase trust? we'll nudge relation
-                                dip.update_relations(v.get("from"), 0.1)
+                                # dip.update_relations(v.get("from"), 0.1)
                             except Exception:
                                 pass
                     # clear processed aid request from memory
@@ -332,7 +344,8 @@ class SettlementAIComponent(Component):
 
         # 6b: prosperity → festival
         if tile.has_tag("wealthy"):
-            action.trigger_event("festival")
+            action.trigger_event("do_nothing")
+            # action.trigger_event("festival")
 
         # 6c: bandits near → raid risk
         if nearby_bandits and not tile.has_tag("storm_damage"):

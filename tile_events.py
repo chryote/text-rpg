@@ -44,6 +44,18 @@ TILE_EVENT_LIBRARY: Dict[str, Dict[str, Any]] = {
         "effects": {"wealth_bonus": 1.1, "supply_bonus": 2},
         "desc": "Caravans bring wealth and goods from neighboring regions.",
     },
+    "send_aid": {
+        "duration": 100,
+        "tags": ["aid_sent"],
+        "effects": {},
+        "desc": "Caravans bring aid and relief to those who need.",
+    },
+    "request_aid": {
+        "duration": 100,
+        "tags": ["aid_requested"],
+        "effects": {},
+        "desc": "This settlement facing deficit in supplies, asking aid from other neighbors.",
+    },
     "forest_bloom": {
         "duration": 4,
         "tags": ["blooming"],
@@ -61,6 +73,12 @@ TILE_EVENT_LIBRARY: Dict[str, Dict[str, Any]] = {
         "tags": [],
         "effects": {"eco_reset": True},
         "desc": "Overgrowth and imbalance lead to ecological collapse."
+    },
+    "do_nothing": {
+        "duration": 1,
+        "tags": [],
+        "effects": {},
+        "desc": "Placeholder for event trigger."
     },
 }
 
@@ -207,7 +225,7 @@ def TriggerEventFromLibrary(tile, event_name):
     from world_utils import GetActiveTiles
 
     # NON-PAYLOAD EVENTS → normal behavior
-    if event_name not in ["trade_mission", "aid", "raid"]:
+    if event_name not in ["trade_mission", "send_aid", "raid"]:
         data = TILE_EVENT_LIBRARY[event_name]
         RegisterTileEvent(tile, event_name, data["duration"], data["effects"], data.get("desc",""))
         return
@@ -288,8 +306,8 @@ def TriggerEventFromLibrary(tile, event_name):
         print ("[DEBUG:PAYLOAD] PAYLOAD PRESENT :", event_name)
         payload_data = {"type": "trade_caravan", "supplies": 5, "wealth": 2, "sub_commodities": {}, "relationship_mod": 2}
 
-    elif event_name == "aid":
-        payload_data = {"type": "aid_shipment", "supplies": 12, "wealth": 0, "sub_commodities": {}, "relationship_mod": 4}
+    elif event_name == "send_aid":
+        payload_data = {"type": "aid_shipment", "supplies": 5, "wealth": 0, "sub_commodities": {}, "relationship_mod": 2}
 
     else:  # raid
         payload_data = {"type": "raid_party", "supplies": 0, "wealth": -8, "sub_commodities": {}, "relationship_mod": -10}

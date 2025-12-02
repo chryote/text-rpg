@@ -1,6 +1,6 @@
 # entities/components/diplomacy.py
 from ..component import Component
-from world_utils import GetNearestTileWithSystem
+from world_utils import GetNearestTileWithSystem, GetActiveTiles
 import world_index_store
 
 class DiplomacyComponent(Component):
@@ -26,39 +26,77 @@ class DiplomacyComponent(Component):
     def request_aid(self, world, reason="supply_shortage"):
         """
         Ask nearest partner for help: apply a tag to self and notify partner via memory.
-        This is intentionally simple: partner AI can detect 'aid_request' tags in neighbors.
+        This is intentionally simple: partner AI can detect 'aid_requested' tags in neighbors.
         """
         partner = self.get_nearest_partner(world)
+
         if not partner:
             return False
 
+        print ("[DEBUG:DIPLOMACY] PARTNER DATA: ", partner)
+
         # mark self asking for aid
-        self.entity.tile.add_tag("aid_requested")
+        if not self.entity.tile.has_tag("aid_requested"):
+            action = self.entity.get("action")
+            action.trigger_event("request_aid")
+
+            # Broadcast help to all settlement
+            for otherSettlement in GetActiveTiles(world, "economy"):
+
+                if (otherSettlement.x, otherSettlement.y) == (self.entity.tile.x, self.entity.tile.y):
+                    # it current tile, so skip it
+                    continue
+
+                print("[DEBUG:DIPLOMACY] BROADCAST HELP TO: ", otherSettlement, self.entity.tile)
+
+                for ent in otherSettlement.entities:
+                    d = ent.get("diplomacy")
+
+                    # Directly inject it on short memory of other settlement
+                    mem = ent.get("memory")
+                    if mem:
+                        mem.remember(f"aid_request_from_{self.entity.id}", {
+                            "from": (self.entity.tile.x, self.entity.tile.y),
+                            "reason": reason
+                        }, long_term=False)
+
+                        print("[DEBUG:DIPLOMACY] CHECKING IF MEMORY EXISTS:", mem.short)
+            return True
+
         # notify partner by writing into its tile memory (if present)
         # partner may have entities -> find diplomacy or memory component
-        for ent in partner.entities:
-            d = ent.get("diplomacy")
-            mem = ent.get("memory")
-            if mem:
-                mem.remember(f"aid_request_from_{self.entity.id}", {
-                    "from": (self.entity.tile.x, self.entity.tile.y),
-                    "reason": reason
-                }, long_term=False)
-        return True
+
+        # for ent in partner.entities:
+        #     d = ent.get("diplomacy")
+        #     mem = ent.get("memory")
+        #     if mem:
+        #         mem.remember(f"aid_request_from_{self.entity.id}", {
+        #             "from": (self.entity.tile.x, self.entity.tile.y),
+        #             "reason": reason
+        #         }, long_term=False)
+        # return True
 
     def offer_aid(self, world, target_tile, amount_supplies=5):
-        # simple transfer: increase supplies at target_tile and reduce own econ slightly
-        source_econ = self.entity.tile.get_system("economy")
-        target_econ = target_tile.get_system("economy")
-        if not source_econ or not target_econ:
-            return False
 
-        give = min(amount_supplies, max(0, source_econ.get("supplies", 0) * 0.2))
-        source_econ["supplies"] = max(0, source_econ.get("supplies", 0) - give)
-        target_econ["supplies"] = target_econ.get("supplies", 0) + give
-        # tag both for narrative hooks
-        self.entity.tile.add_tag("offered_aid")
-        target_tile.add_tag("received_aid")
+        print("[DEBUG:DIPLOMACY] SENDING AID TO OTHER SETTLEMENT")
+        # Use new payload system to handle supplies sharing and relationship update
+        # Inject temporary destination tile on self tile, so payload event can be handled by TriggerEventFromLibrary
+        self.entity.tile.temp_dest = target_tile
+        action = self.entity.get("action")
+        action.trigger_event("send_aid")
+
+        # # simple transfer: increase supplies at target_tile and reduce own econ slightly
+        # source_econ = self.entity.tile.get_system("economy")
+        # target_econ = target_tile.get_system("economy")
+        # if not source_econ or not target_econ:
+        #     return False
+        #
+        # give = min(amount_supplies, max(0, source_econ.get("supplies", 0) * 0.2))
+        # source_econ["supplies"] = max(0, source_econ.get("supplies", 0) - give)
+        # target_econ["supplies"] = target_econ.get("supplies", 0) + give
+        # # tag both for narrative hooks
+        # self.entity.tile.add_tag("offered_aid")
+        # target_tile.add_tag("received_aid")
         return True
 
     def update_relations(self, target_id, delta):

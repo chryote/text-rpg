@@ -225,16 +225,16 @@ def Main():
     # print("Final settlement economy:", econ)
     # print("Tile from settlement:", tile)
 
-    # tile = GetTile(world, 98, 16)
+    tile = GetTile(world, 19, 0)
     # print("ACTUAL MEMORY SYSTEM:", tile.get_system("economy")) # Result None
     # print("ACTUAL MEMORY SYSTEM:", tile.get_system("memory")) # Result None
     # print("ACTUAL MEMORY SYSTEM:", tile.get_system("eco")) # {'producers': 602.1168973992137, 'herbivores': 36.76100517215208, 'carnivores': 3.7153955467983106, 'season': 'wet'}
     # print("ACTUAL MEMORY SYSTEM:", tile.get_system("weather")) # Result {'intensity': 0.609, 'state': 'rain'}
-    # if tile:
-    #     tile_dict = tile.to_dict()
-    #     print(json.dumps(tile_dict, indent=2))
-    # else:
-    #     print("Out of bounds or empty tile")
+    if tile:
+        tile_dict = tile.to_dict()
+        print(json.dumps(tile_dict, indent=2))
+    else:
+        print("Out of bounds or empty tile")
 
     # eco = tile.get_system("eco")
     # print(
