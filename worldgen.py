@@ -1055,8 +1055,8 @@ def UpdateWeather(world, world_time, rng=None,
     # ------------------------------------------------------------
     # PASS 2 — WIND field (single loop)
     # ------------------------------------------------------------
-    dirs = ["wind_field_moving_north","wind_field_moving_northeast","wind_field_moving_east","wind_field_moving_southeast",
-            "wind_field_moving_south","wind_field_moving_southwest","wind_field_moving_west","wind_field_moving_northwest"]
+    dirs = ["wind_direction_moving_north","wind_direction_moving_northeast","wind_direction_moving_east","wind_direction_moving_southeast",
+            "wind_direction_moving_south","wind_direction_moving_southwest","wind_direction_moving_west","wind_direction_moving_northwest"]
 
     for y in range(H):
         wn_row = wind_noise[y]

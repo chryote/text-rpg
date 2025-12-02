@@ -77,8 +77,8 @@ def main():
     # Force sender into supply crisis so AI triggers trade_mission
     # ----------------------------------------------------
     econ = sender_tile.get_system("economy")
-    sender_tile.temp_dest = receiver_tile
-    sender_tile.world_reference = world
+    # sender_tile.temp_dest = receiver_tile
+    # sender_tile.world_reference = world
     econ["supplies"] = 1   # critical low
     econ["population"] = max(10, econ.get("population", 10))
 
@@ -103,12 +103,12 @@ def main():
     event_manager.register_hourly(UpdateAllEntities)
     event_manager.register_interval(1, TriggerTileEvents)
 
-    TriggerEventFromLibrary(tile, "market_boom")
+    # TriggerEventFromLibrary(tile, "market_boom")
 
     # ----------------------------------------------------
     # Run ~2 days of hourly ticks so AI triggers trade_mission
     # ----------------------------------------------------
-    time_system.run(hours=300)
+    time_system.run(hours=100)
 
     print("\nEntities on sender tile:", [e.type for e in sender_tile.entities])
 
