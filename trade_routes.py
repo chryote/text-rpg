@@ -411,7 +411,7 @@ def TagSettlements(world, profiles, routes):
 
         # remove old derived tags first
         for tag in ["prosperous", "struggling", "supplies_deficit",
-                    "trade_hub", "bandit_settlement"]:
+                    "trade_hub", "bandit_settlement", "bandit_infested_settlement"]:
             if tag in tile.tags:
                 tile.tags.remove(tag)
 
