@@ -20,7 +20,7 @@ from event_manager import EventManager, DailySettlementSnapshot, TickSettlements
 from tile_state import TileState
 from world_index import WorldIndex
 import world_index_store
-from trade_routes import GenerateTradeRoutes, ApplyTradeEffects
+from trade_routes import GenerateTradeRoutes, ApplyTradeEffects, UpdateTradeRouteRisks
 from trade_visual import PrintTradeRoutes
 from entities.update_all import UpdateAllEntities
 
@@ -193,6 +193,9 @@ def Main():
     event_manager.register_interval(48, lambda w, m, c, r: CheckAndTriggerEcoEvents(w, m, c.global_tick))
 
     def DailyTradeTick(world, macro, clock, region):
+        # 1. Update Risks BEFORE applying effects
+        UpdateTradeRouteRisks(world)  # <<-- NEW: Recalculate risk
+
         ApplyTradeEffects(world)
 
     event_manager.register_global(DailyTradeTick)

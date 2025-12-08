@@ -510,3 +510,42 @@ def ApplyTradeEffects(world):
 
         econ["wealth"] = max(0.0, econ["wealth"])
         econ["supplies"] = max(0.0, econ["supplies"])
+
+
+def UpdateTradeRouteRisks(world):
+    """
+    Recalculates the risk for all existing trade links based on the current
+    state of the path tiles (weather, eco_risk, bandits, etc.).
+    This should be called before ApplyTradeEffects.
+    """
+    # Note: world_index_store is already imported at the top of the file.
+
+    # 1. Access the trade_links data stored in the world[0][0] meta system
+    # Assuming GenerateTradeRoutes previously stored it here:
+    meta = world[0][0].get_system("meta")
+    trade_links = meta.get("trade_links")
+
+    if not trade_links:
+        # print("[TradeRoutes] No trade links found to update risks.")
+        return
+
+    # Use defaultdict only for temporary storage if structure needs recreation
+    updated_links = defaultdict(list)
+
+    # 2. Iterate and recalculate risk for every link
+    for sid, links in trade_links.items():
+        for link in links:
+            # The original path (list of TileState objects) is preserved in the link
+            path = link["path"]
+
+            # Re-evaluate the risk using the dynamic state of the tiles
+            new_risk = EvaluateRouteRisk(path)
+
+            # 3. Update the risk value in the structure
+            link["risk"] = new_risk
+
+            updated_links[sid].append(link)
+
+    # 4. Overwrite the old trade links with the newly updated one
+    meta["trade_links"] = updated_links
+    # print("[TradeRoutes] All route risks updated.")

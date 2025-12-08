@@ -133,10 +133,92 @@ class SettlementAIComponent(Component):
                     subs[k] = max(0.0, subs[k] * 0.999)
                 return bh.Status.SUCCESS
 
+        class CheckAndExecuteRaid(bh.Node):
+            def tick(self):
+                # 1. Check Self-Personality: Only act if Aggressive or Greedy
+                pers = entity.get("personality")
+                if pers.get("greedy") < 0.6 and pers.get("aggressive") < 0.6:
+                    return bh.Status.FAILURE
+
+                # 2. Find Target: Look for nearby vulnerable settlements
+                target_tile = None
+
+                # Check neighbors within radius=5 (from PerceptionComponent init)
+                for n_tile in entity.get("perception").blackboard.get("neighbors", []):
+                    econ = n_tile.get_system("economy")
+                    if not econ or n_tile is entity.tile:
+                        continue
+
+                    # Vulnerable Target: Wealthy AND Struggling
+                    if n_tile.has_tag("wealthy") and n_tile.has_tag("struggling"):
+                        target_tile = n_tile
+                        break
+
+                if target_tile:
+                    # 3. Trigger Raid Payload
+                    action = entity.get("action")
+                    action.trigger_event("raid")  # Use "raid" which sends the payload
+
+                    # 4. Add Flavor Tag to Self
+                    entity.tile.add_tag("opportunistic_raid")
+
+                    # Store destination for payload system if needed (TriggerEventFromLibrary handles this now)
+                    entity.tile.temp_dest = target_tile
+
+                    print(f"[AI] RAIDS: Targeting {target_tile.pos} (Vulnerable)")
+                    return bh.Status.SUCCESS
+
+                return bh.Status.FAILURE
+
+        class CheckAndExecuteAid(bh.Node):
+            def tick(self):
+                # 1. Check Self-Personality: Only act if Cooperative
+                pers = entity.get("personality")
+                # if pers.get("cooperative") < 0.6:
+                if pers.get("cooperative") < 0.4:
+                    return bh.Status.FAILURE
+
+                # 2. Check Self-Resources: Must have a surplus to give aid
+                econ = entity.tile.get_system("economy")
+                # if econ.get("supplies", 0) < econ.get("population", 1) * 1.5:
+                if econ.get("supplies", 0) < 20:
+                    return bh.Status.FAILURE
+
+                # 3. Find Target: Check Memory for aid requests
+                mem = entity.get("memory")
+                aid_request_key = next((k for k in mem.short if k.startswith("aid_request_from_")), None)
+
+                if aid_request_key:
+                    # Target found in memory (via DiplomacyComponent's broadcast)
+                    v = mem.recall(aid_request_key)
+                    coords = v["from"]
+
+                    if coords:
+                        # Find the tile (assumes index is available)
+                        rx, ry = coords
+                        world = entity.tile.index.world
+                        target_tile = world[ry][rx]
+
+                        # 4. Trigger Aid Payload (via DiplomacyComponent)
+                        dip = entity.get("diplomacy")
+                        dip.offer_aid(world, target_tile, amount_supplies=3)
+
+                        # 5. Add Flavor Tag to Self
+                        entity.tile.add_tag("diplomatic_support")
+
+                        print(f"[AI] AID: Offering aid to {target_tile.pos} (Crisis)")
+                        # Clear memory entry after action
+                        del mem.short[aid_request_key]
+                        return bh.Status.SUCCESS
+
+                return bh.Status.FAILURE
+
         # Compose BT
         root = bh.Selector([
-            bh.Sequence([CheckThreat(), DefendAction()]),
-            bh.Sequence([CheckSupplyCrisis(), HandleSupplyAction()]),
+            bh.Sequence([CheckThreat(), DefendAction()]),  # Priority 1: DEFEND
+            CheckAndExecuteRaid(),  # Priority 2: RAID (Opportunistic)
+            CheckAndExecuteAid(),  # Priority 3: AID (Diplomatic)
+            bh.Sequence([CheckSupplyCrisis(), HandleSupplyAction()]),  # Priority 4: SELF-HELP (if raid/aid failed)
             bh.Sequence([CheckProsperity(), CelebrateAction()]),
             Idle()
         ])
@@ -157,9 +239,6 @@ class SettlementAIComponent(Component):
         econ = tile.get_system("economy")
         if not econ:
             return
-
-        if (tile.x, tile.y) == (8,1):
-            print ("[DEBUG:ECONOMY] INSPECTING (8,1) : ", econ["supplies"])
 
         # ensure subcomponents exist
         mem = self.entity.get("memory")
@@ -187,30 +266,6 @@ class SettlementAIComponent(Component):
         # 4) Let AI component tick the BT (AIComponent.update handles tick)
         if ai:
             ai.update(world)
-
-        # 5) Diplomatic auto-response: if memory has aid_request entries, consider offering small help
-        if dip and mem:
-            # simple heuristic: if we have high supplies and recently saw aid request, give a little
-            for k, v in list(mem.short.items()):
-                if k.startswith("aid_request_from_"):
-                    # if econ.get("supplies", 0) > econ.get("population", 1) * 1.5:
-                    if econ.get("supplies", 0) > 2:
-                        print("[DEBUG:DIPLOMACY] CHECKING FOR AID REQUEST", k)
-                        # find requester tile coordinates in v and offer aid
-                        v = mem.recall(k)
-                        coords = v["from"]
-
-                        if coords:
-                            rx, ry = coords
-                            try:
-                                requester_tile = tile.index.world[ry][rx]
-                                dip.offer_aid(tile.index.world, requester_tile, amount_supplies=3)
-                                # reduce trust? increase trust? we'll nudge relation
-                                # dip.update_relations(v.get("from"), 0.1)
-                            except Exception:
-                                pass
-                    # clear processed aid request from memory
-                    del mem.short[k]
 
     def oldUpdate(self, world):
         """
