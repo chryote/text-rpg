@@ -20,7 +20,7 @@ from event_manager import EventManager, DailySettlementSnapshot, TickSettlements
 from tile_state import TileState
 from world_index import WorldIndex
 import world_index_store
-from trade_routes import GenerateTradeRoutes, ApplyTradeEffects, UpdateTradeRouteRisks
+from trade_routes import GenerateTradeRoutes, ApplyTradeEffects, UpdateTradeRouteRisks, UpdateTradeNetwork
 from trade_visual import PrintTradeRoutes
 from entities.update_all import UpdateAllEntities
 
@@ -202,6 +202,8 @@ def Main():
 
     event_manager.register_global(DailySettlementSnapshot)
 
+    event_manager.register_interval(168, UpdateTradeNetwork)
+
     print("Running 5 in-game days of economy simulation...\n")
     print("Global subscribers:", time_system.subscribers.get("global"))
     time_system.run(hours=2 * 24)
@@ -238,59 +240,6 @@ def Main():
         print(json.dumps(tile_dict, indent=2))
     else:
         print("Out of bounds or empty tile")
-
-    # eco = tile.get_system("eco")
-    # print(
-    #     f"Producers: {eco['producers']:.1f}, Herbivores: {eco['herbivores']:.1f}, Carnivores: {eco['carnivores']:.1f}")
-    # print(
-    #     f"Weather: {tile.get_system('weather')['state']}, Humidity: {tile.get_system('humidity')['current']}, Climate: {tile.climate}")
-    #
-    # region = GetRegionByTile(macro, 40, 47)
-    # traits = region.get("region_traits", {})
-    #
-    # print (region)
-
-    # targetRegion = GetRegionByTile(macro, 11, 79)
-    # if targetRegion:
-    #     print(targetRegion['id'], targetRegion['terrain'])
-    #
-    # west_tiles = GetRegionSectorTiles(world, macro, "continent", 1, "north")
-    # print(f"Western sector of Continent #1: {len(west_tiles)} tiles")
-    #
-    # for r in macro["regions"]:
-    #     print(f"[{r['terrain']:<16}] #{r['id']:>3} → {r['name']}")
-
-    # time_system = TimeSystem(start_day=0, start_hour=20)
-
-    # # Define regions with timezone offsets (east positive, west negative)
-    # time_system.add_region("Eastern Isles", offset_hours=+3)
-    # time_system.add_region("Central Empire", offset_hours=0)
-    # time_system.add_region("Western Frontier", offset_hours=-4)
-
-    # # Advance one hour
-    # time_system.clock.advance_local_tick()
-    #
-    # # Advance multiple hours manually
-    # for _ in range(6):
-    #     time_system.clock.advance_local_tick()
-
-    # Subscribe to events
-    # time_system.subscribe("local", hourly_event)
-    # time_system.subscribe_every(6, six_hour_event)
-    # time_system.subscribe("global", daily_event)
-    #
-    # # Example: per-region hourly display
-    # def update_regions(clock, _):
-    #     for region in time_system.regions:
-    #         regional_behavior(clock, region)
-    #
-    # time_system.subscribe("local", update_regions)
-    #
-    # # Run for two days (48 hours)
-    # time_system.run(hours=48)
-
-    # history = RunHistorySimulation(world, master_seed, steps = 365, sample_coords=(0, 59))
-    # PlotEcosystemHistory(history)
 
 # Execute Main
 if __name__ == '__main__':

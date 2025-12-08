@@ -1,6 +1,7 @@
 # directory tile_events.py
 from typing import Dict, Any
 from world_utils import GetActiveTiles
+from resource_catalog import GetResourcesByType, GetResourceType
 from world_index_store import world_index
 import json
 
@@ -11,7 +12,14 @@ TILE_EVENT_LIBRARY: Dict[str, Dict[str, Any]] = {
     "market_boom": {
         "duration": 6,
         "tags": [],
-        "effects": {"wealth_bonus": 1.05},
+        "effects": {
+            "wealth_bonus": 1.05,
+            # NEW: Positive shock for Trade/Luxury goods
+            "commodity_shock": {
+                "trade": 0.05,  # Small boost to trade commodity values
+                "luxury": 0.03  # Small boost to luxury commodity values
+            }
+        },
         "desc": "Trade activity surges; wealth increases slightly each tick.",
     },
     "common_raid": {
@@ -28,8 +36,16 @@ TILE_EVENT_LIBRARY: Dict[str, Dict[str, Any]] = {
     },
     "drought": {
         "duration": 8,
-        "tags": [],
-        "effects": {"supply_drain": 3, "wealth_bonus": 0.97},
+        "tags": ["water_crisis"], # Add a persistent tag for narrative/AI awareness
+        "effects": {
+            "supply_drain": 3,
+            "wealth_bonus": 0.97,
+            # NEW: Negative shock for Food items
+            "commodity_shock": {
+                "food": -0.2, # Reduces food commodity value by 0.2 per tick
+                "material": -0.05 # Minor reduction in material harvest
+            }
+        },
         "desc": "Water shortage reduces crop yield and economic activity.",
     },
     "common_trade_mission": {
@@ -188,6 +204,25 @@ def _apply_tile_event_effects(tile, econ, effects):
     """
     if "wealth_bonus" in effects:
         econ["wealth"] *= effects["wealth_bonus"]
+
+    if "commodity_shock" in effects:
+        shocks = effects["commodity_shock"]
+        subs = econ.get("sub_commodities", {})
+
+        for name, value in subs.items():
+            # Determine the resource category (e.g., 'food', 'material')
+            category = GetResourceType(name)  # Uses imported GetResourceType
+
+            # Check if this category has a shock defined in the event
+            if category in shocks:
+                delta = shocks[category]
+
+                # Apply the shock to the commodity's current value
+                # Using max(0.0) prevents commodity values from going negative
+                subs[name] = max(0.0, subs[name] + delta)
+
+                # Re-attach the modified sub_commodities back to the economy system
+        econ["sub_commodities"] = subs
 
     if "supply_bonus" in effects:
         econ["supplies"] += effects["supply_bonus"]

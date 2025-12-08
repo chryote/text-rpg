@@ -28,6 +28,17 @@ import math
 from world_utils import GetNearestTileWithSystem, GetTilesWithinRadius, GetActiveTiles
 import world_index_store
 
+# -------------------------------------------------------------------
+# 0. Helpers for Entity Access
+# -------------------------------------------------------------------
+
+def get_settlement_ai(tile):
+    """Safely fetch the primary Settlement AI entity from the tile."""
+    # Assumes settlement_ai is on the tile if tile.terrain is "settlement"
+    for entity in tile.entities:
+        if entity.type == "settlement_ai":
+            return entity
+    return None
 
 # -------------------------------------------------------------------
 # 1. Settlement Profile Extraction
@@ -95,7 +106,8 @@ def CollectSettlementProfiles(world):
 
 def FindTradePartners(world, profiles, max_partners=3, search_radius=60):
     """
-    For each settlement, find closest complementary partners.
+    For each settlement, find closest complementary partners,
+    modulating the score by Affinity and Cautiousness/Distance.
 
     Returns:
         partners[sid] = list of other settlement_ids
@@ -109,6 +121,17 @@ def FindTradePartners(world, profiles, max_partners=3, search_radius=60):
         tile = profile["tile"]
         x, y = tile.x, tile.y
 
+        # 1. Get Affinity/Caution details for Settlement A
+        entityA = get_settlement_ai(tile)
+        if not entityA:
+            continue
+
+        cautious_trait = entityA.get("personality").get("cautious")
+        rel_comp_A = entityA.get("relationship")
+
+        # Max distance proxy used to normalize the cautious penalty
+        max_distance_proxy = search_radius * 0.75
+
         # scan nearby tiles for settlement candidates
         candidates = []
         nearby = widx.tiles_within_radius(x, y, search_radius)
@@ -121,16 +144,17 @@ def FindTradePartners(world, profiles, max_partners=3, search_radius=60):
                 continue
             candidates.append((osid, t))
 
-        # score candidates by complementarity + distance
+        # score candidates by complementarity + distance + affinity + caution
         scored = []
         for osid, otile in candidates:
-            d2 = (otile.x - x) ** 2 + (otile.y - y) ** 2
-            if d2 == 0:
+            d_raw = (otile.x - x) ** 2 + (otile.y - y) ** 2
+            d_euc = d_raw ** 0.5
+            if d_euc == 0:
                 continue
 
             # original dicts
-            expA = profile["exports"]  # dict: resource -> amount
-            impA = profile["imports"]  # dict: resource -> demand amount
+            expA = profile["exports"]
+            impA = profile["imports"]
             expB = profiles[osid]["exports"]
             impB = profiles[osid]["imports"]
 
@@ -142,7 +166,24 @@ def FindTradePartners(world, profiles, max_partners=3, search_radius=60):
             if complement_value == 0:
                 continue
 
-            score = complement_value / (d2 ** 0.5)  # higher when closer + bigger match
+            # --- NEW: Affinity Factor (Favorable relationships boost score) ---
+            entityB = get_settlement_ai(otile)
+            if entityB and rel_comp_A:
+                rel_score = rel_comp_A.get(entityB.id)
+                # Maps [-100, 100] to a multiplier of [0.5, 1.5]
+                affinity_factor = 1.0 + (rel_score / 100) * 0.5
+            else:
+                affinity_factor = 1.0
+
+            # --- NEW: Cautious Distance Penalty ---
+            # Penalty increases with distance (d_euc) and cautious trait value.
+            # Max Cautious is 1.0. Penalty ensures long routes are disfavored.
+            cautious_penalty_factor = 1.0 + (cautious_trait * d_euc) / max(1.0, max_distance_proxy)
+
+            # --- NEW: Final Score Calculation ---
+            # Score = (ComplementValue * Affinity) / (Distance * Penalty)
+            score = (complement_value * affinity_factor) / (d_euc * cautious_penalty_factor)
+
             scored.append((score, osid))
 
         scored.sort(reverse=True)
@@ -386,17 +427,41 @@ def TagSettlements(world, profiles, routes):
         if len(routes.get(sid, [])) >= 3:
             tile.add_tag("trade_hub")
 
-    # Bandit logic
+    # --- Dynamic Conflict Trigger Sophistication ---
     for sid, prof in profiles.items():
         tile = prof["tile"]
         econ = tile.get_system("economy")
-
         prosperity = econ.get("prosperity", 0)
 
-        # bandit risk if in wilderness + low prosperity + low connectivity
+        # 1. Check for local risk factors
+        local_risk_score = 0
+
+        # Risk Factor A: High outgoing route risk (External Threat)
+        links = routes.get(sid, [])
+        avg_route_risk = sum(link["risk"] for link in links) / max(1, len(links))
+        if avg_route_risk > 2.0:  # High risk threshold
+            local_risk_score += 1
+
+        # Risk Factor B: Nearby Hostile Relations (Social Conflict)
+        entityA = get_settlement_ai(tile)
+        if entityA:
+            rel_comp = entityA.get("relationship")
+            if rel_comp:
+                for score in rel_comp.table.values():
+                    if score < -50:  # Strong rivalry (potential conflict trigger)
+                        local_risk_score += 1
+                        break  # Only need one hostile neighbor to trigger this factor
+
+        # Risk Factor C: High wilderness exposure (Local Environment)
         neighbor_tiles = GetTilesWithinRadius(world, tile.x, tile.y, radius=3)
-        wild_count = sum(1 for t in neighbor_tiles if t.terrain not in ["settlement", "coastal", "plains"])
-        if prosperity < 30 and wild_count > 5:
+        # Wilderness: areas not immediately next to other settlements or easy movement tiles
+        wild_count = sum(1 for t in neighbor_tiles if t.terrain not in ["settlement", "coastal", "plains", "riverside"])
+
+        if wild_count > 5:  # High wilderness exposure threshold
+            local_risk_score += 1
+
+        # Final Tag Assignment: Bandit presence requires low prosperity/vulnerability AND enough risk factors
+        if prosperity < 50 and local_risk_score >= 2:
             tile.add_tag("bandit_infested_settlement")
 
 
@@ -511,6 +576,22 @@ def ApplyTradeEffects(world):
         econ["wealth"] = max(0.0, econ["wealth"])
         econ["supplies"] = max(0.0, econ["supplies"])
 
+
+def UpdateTradeNetwork(world, macro, clock, region):
+    """
+    Recalculate the entire trade network (partnerships, routes, values)
+    periodically to reflect changes in economy, relationships, and risk.
+    Runs every 7 global ticks (days).
+    """
+
+    # Rerun the full generation pipeline
+    new_trade_links = GenerateTradeRoutes(world)
+
+    # Overwrite the stored links
+    meta = world[0][0].get_system("meta")
+    meta["trade_links"] = new_trade_links
+
+    print(f"[{clock}] Trade Network Recalculated! {len(new_trade_links)} link groups renewed.")
 
 def UpdateTradeRouteRisks(world):
     """

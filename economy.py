@@ -6,6 +6,20 @@ from world_utils import GetActiveTiles
 from entities.settlement_factory import CreateSettlementAI
 import math
 
+REGION_TRAIT_BONUSES = {
+    "mining": ["iron", "stone", "crystallized water"],
+    "fortress": ["iron", "stone"],
+    "fertile": ["root_tubers", "fungal_clusters"],
+    "abundant_wood": ["timber", "golden timber"],
+    "dense_fauna": ["meat"],
+    "fishing": ["fish", "reeds"],
+    "nomads": ["spices", "iron grass"],
+    "trade_routes": ["spices", "salt"],
+    "civilization": ["luxury_wood", "lucid_seed"]
+}
+REGION_MULTIPLIER_INIT = 1.25 # Initial boost at world creation
+REGION_MULTIPLIER_TICK = 1.06 # Persistent tick boost
+
 # --- Economy helpers
 def GetSettlementCoordsByID(world, settlement_id):
     """
@@ -46,6 +60,19 @@ def GetAllSettlementIDs(world):
 # -----------------------------
 # Settlement Category Helpers
 # -----------------------------
+
+def get_region_resource_tags(tile):
+    """Derive resource tags from the tile's regional keys (from DetectRegions)."""
+    # NOTE: This is a simplified derivation since the macro object is not available here.
+    tags = set()
+    for r_type in tile.regions.keys():
+        r_type = r_type.replace("_cluster", "").replace("ocean_", "").replace("continent", "diverse")
+        if r_type == "mountain": tags.add("mining")
+        elif r_type == "forest": tags.add("abundant-wood")
+        elif r_type == "dryland": tags.add("nomads")
+        elif r_type == "lake" or r_type == "coastal": tags.add("fishing")
+        elif r_type == "diverse": tags.add("civilization")
+    return tags
 
 def get_settlement_category(tile):
     """Return the category string or None."""
@@ -246,6 +273,16 @@ def InitializeSettlementEconomy(world, rng: Random):
             base_resources = GetResourcesForTile(tile)  # <- FIX: pass tile, not a terrain name
             subs = {k: round(v * rng.uniform(0.5, 1.5), 2) for k, v in base_resources.items()}
 
+            # --- NEW: Apply Regional Trait Bonuses to initial sub-commodities (Initialization) ---
+            region_tags = get_region_resource_tags(tile)
+
+            for trait in region_tags:
+                resources_to_boost = REGION_TRAIT_BONUSES.get(trait, [])
+                for r_name in resources_to_boost:
+                    if r_name in subs:
+                        # Give a strong initial bonus if the settlement is in a resource-rich region
+                        subs[r_name] = round(subs[r_name] * rng.uniform(1.0, REGION_MULTIPLIER_INIT), 3)
+
             base_supplies = rng.uniform(80, 150)
             base_wealth = rng.uniform(50, 120)
             base_population = rng.uniform(80, 300)
@@ -358,7 +395,7 @@ def SimulateSettlementEconomy(world, rng=None):
             subs[name] = max(0.0, round(value + drift, 3))
         econ["sub_commodities"] = subs
 
-        commodities_mod = ComputeSubCommoditiesModifier(econ)
+        commodities_mod = ComputeSubCommoditiesModifier(tile)
 
         econ["wealth"] += commodities_mod
 
@@ -378,13 +415,24 @@ def SimulateSettlementEconomy(world, rng=None):
 
     return world
 
-def ComputeSubCommoditiesModifier(econ):
+def ComputeSubCommoditiesModifier(tile):
     """
     Broad category modifier: food/material/trade/luxury
     Safe diminishing wealth modifier to prevent runaway growth.
     """
+    econ = tile.get_system("economy")  # <-- GET ECON FROM TILE
     types = econ.get("settlement_type", [])
     subs = econ.get("sub_commodities", {})
+
+    # --- NEW: Apply Regional Trait Bonuses (Persistent Boost) ---
+    region_tags = get_region_resource_tags(tile)
+    for trait in region_tags:
+        resources_to_boost = REGION_TRAIT_BONUSES.get(trait, [])
+        for name in subs:
+            if name in resources_to_boost:
+                # Apply small persistent tick boost
+                subs[name] *= REGION_MULTIPLIER_TICK
+
     if not types or not subs:
         return 0.0
 

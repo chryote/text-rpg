@@ -160,7 +160,7 @@ def AssignRegionTraits(macro, world, rng=None):
             traits.append("resource-rich")
             flavor_tags += ["mining", "fortress"]
         elif terrain == "forest_cluster":
-            traits.append("abundant-wood")
+            traits.append("abundant_wood")
             flavor_tags += ["herbalism", "bandits"]
         elif terrain == "dryland_cluster":
             traits.append("harsh")
