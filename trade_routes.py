@@ -469,19 +469,97 @@ def TagSettlements(world, profiles, routes):
 # 7. Full Pipeline
 # -------------------------------------------------------------------
 
+# -------------------------------------------------------------------
+# 7B. Fully Connected Trade Network (MST + Partner Routes)
+# -------------------------------------------------------------------
+
 def GenerateTradeRoutes(world):
     """
-    Run the full simple trade pipeline. Returns:
-        trade_links = {
-            sid: [ { 'partner': id,
-                     'value': float,
-                     'risk': float,
-                     'path': [TileState...] } ]
-        }
+    Improved version:
+    - Ensures that ALL settlements are connected using MST backbone.
+    - Adds the original partner-based trade routes as additional edges.
     """
+
     profiles = CollectSettlementProfiles(world)
+
+    # ------------------------------------------------------------------
+    # STEP 1: List all settlements
+    # ------------------------------------------------------------------
+    settlements = list(profiles.items())  # [(sid, profile), ...]
+    n = len(settlements)
+    if n <= 1:
+        return {}
+
+    # ------------------------------------------------------------------
+    # STEP 2: Precompute all pairwise shortest paths (or distances)
+    # Using your existing A*.
+    # ------------------------------------------------------------------
+    distances = {}  # (sidA, sidB) -> (path, total_cost)
+
+    def path_cost(path):
+        return sum(tile_cost(t) for t in path)
+
+    for i in range(n):
+        sidA, profA = settlements[i]
+        for j in range(i + 1, n):
+            sidB, profB = settlements[j]
+            path = FindRoute(world, profA["tile"], profB["tile"])
+            if not path:
+                continue
+            cost = path_cost(path)
+            distances[(sidA, sidB)] = (path, cost)
+            distances[(sidB, sidA)] = (path, cost)
+
+    # ------------------------------------------------------------------
+    # STEP 3: Build MST using Kruskal
+    # ------------------------------------------------------------------
+    parent = {sid: sid for sid, _ in settlements}
+
+    def find(x):
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    def union(a, b):
+        ra, rb = find(a), find(b)
+        if ra == rb:
+            return False
+        parent[rb] = ra
+        return True
+
+    # convert distances into edge list
+    edges = []
+    for (sidA, sidB), (path, cost) in distances.items():
+        if sidA < sidB:  # avoid duplicates
+            edges.append((cost, sidA, sidB, path))
+
+    edges.sort(key=lambda x: x[0])  # Kruskal: sort by cost
+
+    mst_links = defaultdict(list)
+
+    for cost, sidA, sidB, path in edges:
+        if union(sidA, sidB):
+            risk = EvaluateRouteRisk(path)
+            value = ComputeTradeValue(profiles[sidA], profiles[sidB])
+            mst_links[sidA].append({
+                "partner": sidB,
+                "value": value,
+                "risk": risk,
+                "path": path
+            })
+            mst_links[sidB].append({
+                "partner": sidA,
+                "value": value,
+                "risk": risk,
+                "path": path
+            })
+
+    # ------------------------------------------------------------------
+    # STEP 4: Add your existing partner-based routes as "optional extras"
+    # ------------------------------------------------------------------
     partners = FindTradePartners(world, profiles)
-    trade_links = defaultdict(list)
+    extra_links = defaultdict(list)
 
     for sid, plist in partners.items():
         A = profiles[sid]
@@ -490,7 +568,6 @@ def GenerateTradeRoutes(world):
         for osid in plist:
             B = profiles[osid]
             Btile = B["tile"]
-
             value = ComputeTradeValue(A, B)
             if value <= 0:
                 continue
@@ -501,14 +578,33 @@ def GenerateTradeRoutes(world):
 
             risk = EvaluateRouteRisk(path)
 
-            trade_links[sid].append({
+            extra_links[sid].append({
                 "partner": osid,
                 "value": value,
                 "risk": risk,
                 "path": path
             })
 
-    # tagging settlements after all links computed
+    # ------------------------------------------------------------------
+    # STEP 5: Merge MST backbone + extra partner routes
+    # ------------------------------------------------------------------
+    trade_links = defaultdict(list)
+
+    # Always include MST backbone routes
+    for sid, links in mst_links.items():
+        trade_links[sid].extend(links)
+
+    # Add the extra routes (avoid identical duplicates)
+    for sid, links in extra_links.items():
+        existing = {(l["partner"], tuple(l["path"])) for l in trade_links[sid]}
+        for link in links:
+            key = (link["partner"], tuple(link["path"]))
+            if key not in existing:
+                trade_links[sid].append(link)
+
+    # ------------------------------------------------------------------
+    # STEP 6: Settlement tags (unchanged)
+    # ------------------------------------------------------------------
     TagSettlements(world, profiles, trade_links)
 
     return trade_links
