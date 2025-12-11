@@ -5,6 +5,20 @@ from worldgen import GetNeighborsRadius
 from math import sqrt
 from resource_catalog import GetResourcesForTile
 
+SYMBOLS = {
+    "plains": "🌿",
+    "forest": "🌳",
+    "mountain": "⛰️",
+    "settlement": "🏠",
+    "riverside": "🏞️",
+    "wetlands": "💦",
+    "coastal": "🏖️",
+    "deep_water": "🌊",
+    "dryland": "🏜️",
+    "oasis": "⛲",
+    "river": "~"  # symbol for river overlay
+}
+
 def ConvertWorldToTileState(world):
     """Convert 2D list of tile dicts into TileState objects."""
     return [
@@ -152,3 +166,46 @@ def SaveWorldStateToMeta(world, macro):
         return  # world not initialized properly
 
     meta["world_state"] = macro.debug_state()
+
+def PrintWorld(world):
+    for row in world:
+        symbols = []
+        for tile in row:
+            t = tile.terrain
+            if t == "settlement":
+                symbol = SYMBOLS["settlement"]
+            elif tile.has_tag('river'):
+                symbol = SYMBOLS["river"]
+            else:
+                symbol = SYMBOLS.get(t, "?")
+            symbols.append(symbol)
+        print(" ".join(symbols))
+
+def PrintWorldWithCoords(world):
+    width = len(world[0])
+    print("    " + " ".join(f"{x:02}" for x in range(width)))
+
+    for y, row in enumerate(world):
+        row_symbols = []
+        for tile in row:
+            # --- Priority order ---
+            t = tile.terrain
+            if t == "settlement":
+                symbol = SYMBOLS["settlement"]
+
+            elif tile.has_tag("river_source"):
+                symbol = "▲"
+            elif tile.has_tag("river_mouth"):
+                symbol = "▼"
+            elif tile.has_tag("river"):
+                symbol = "~"
+            elif tile.has_tag("carved_valley"):
+                symbol = "."
+            elif tile.has_tag('river'):
+                symbol = SYMBOLS["river"]
+            else:
+                symbol = SYMBOLS.get(t, "?")
+
+            row_symbols.append(symbol)
+
+        print(f"{y:02}  " + " ".join(row_symbols))

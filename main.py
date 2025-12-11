@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 from math import sqrt
 from noise import pnoise2, pnoise3
 
-from world_utils import SaveWorldStateToMeta
+from world_utils import SaveWorldStateToMeta, PrintWorldWithCoords, PrintWorld
 from worldgen import *
 from ecosystem import *
 from behavior import *
@@ -29,20 +29,6 @@ from world_state_director import DirectorController
 
 # --- Global variables
 world_time = 0
-
-SYMBOLS = {
-    "plains": "🌿",
-    "forest": "🌳",
-    "mountain": "⛰️",
-    "settlement": "🏠",
-    "riverside": "🏞️",
-    "wetlands": "💦",
-    "coastal": "🏖️",
-    "deep_water": "🌊",
-    "dryland": "🏜️",
-    "oasis": "⛲",
-    "river": "~"  # symbol for river overlay
-}
 
 def CreateWorld(world_time = None, master_seed = 12345):
     # Create a single deterministic RNG and pass it around
@@ -91,63 +77,6 @@ def CreateWorld(world_time = None, master_seed = 12345):
 
     return world, macro
 
-def PrintWorld(world):
-    for row in world:
-        symbols = []
-        for tile in row:
-            t = tile.terrain
-            if t == "settlement":
-                symbol = SYMBOLS["settlement"]
-            elif tile.has_tag('river'):
-                symbol = SYMBOLS["river"]
-            else:
-                symbol = SYMBOLS.get(t, "?")
-            symbols.append(symbol)
-        print(" ".join(symbols))
-
-def PrintWorldWithCoords(world):
-    width = len(world[0])
-    print("    " + " ".join(f"{x:02}" for x in range(width)))
-
-    for y, row in enumerate(world):
-        row_symbols = []
-        for tile in row:
-            # --- Priority order ---
-            t = tile.terrain
-            if t == "settlement":
-                symbol = SYMBOLS["settlement"]
-
-            elif tile.has_tag("river_source"):
-                symbol = "▲"
-            elif tile.has_tag("river_mouth"):
-                symbol = "▼"
-            elif tile.has_tag("river"):
-                symbol = "~"
-            elif tile.has_tag("carved_valley"):
-                symbol = "."
-            elif tile.has_tag('river'):
-                symbol = SYMBOLS["river"]
-            else:
-                symbol = SYMBOLS.get(t, "?")
-
-            row_symbols.append(symbol)
-
-        print(f"{y:02}  " + " ".join(row_symbols))
-
-def hourly_event(clock, region):
-    hour = clock.local_tick
-    state = GetTimeState(hour)
-    print(f"[{clock}] Time state: {state}")
-
-def six_hour_event(clock, region):
-    print(f"[{clock}] Every 6 hours event fired.")
-
-def daily_event(clock, region):
-    print(f"[{clock}] New day begins! Global update triggered.")
-
-def regional_behavior(clock, region):
-    print(f"  → {region.name} local time {region.local_hour:02d}:00")
-
 # --- Main entry
 def Main():
     director = DirectorController()
@@ -181,9 +110,9 @@ def Main():
     meta = world[0][0].get_system("meta")
     meta["trade_links"] = trade_links
 
-    # PrintWorldWithCoords(world)
-    PrintTradeRoutes(world, trade_links)
-    RenderTradeRouteMap(world, trade_links, tile_size=24, filename="routes.png")
+    PrintWorld(world)
+    # PrintTradeRoutes(world, trade_links)
+    # RenderTradeRouteMap(world, trade_links, tile_size=24, filename="routes.png")
     # Create TimeSystem & EventManager
     time_system = TimeSystem(start_day=0, start_hour=0)
     event_manager = EventManager(world, macro, time_system)
