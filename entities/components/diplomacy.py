@@ -52,7 +52,12 @@ class DiplomacyComponent(Component):
                     # it current tile, so skip it
                     continue
 
-                print("[DEBUG:DIPLOMACY] BROADCAST HELP TO: ", otherSettlement, self.entity.tile)
+                LogEntityEvent(
+                    self.entity,
+                    "DIPLOMACY",
+                    f"Broadcast help to other settlement.",
+                    target_entity=otherSettlement
+                )
 
                 for ent in otherSettlement.entities:
                     d = ent.get("diplomacy")
@@ -65,7 +70,12 @@ class DiplomacyComponent(Component):
                             "reason": reason
                         }, long_term=False)
 
-                        print("[DEBUG:DIPLOMACY] CHECKING IF MEMORY EXISTS:", mem.short)
+                        LogEntityEvent(
+                            self.entity,
+                            "DIPLOMACY",
+                            f"Checking memory if there are aid requests. {mem.short}",
+                            target_entity=partner
+                        )
             return True
 
         # notify partner by writing into its tile memory (if present)
@@ -83,7 +93,12 @@ class DiplomacyComponent(Component):
 
     def offer_aid(self, world, target_tile, amount_supplies=5):
 
-        print("[DEBUG:DIPLOMACY] SENDING AID TO OTHER SETTLEMENT")
+        LogEntityEvent(
+            self.entity,
+            "DIPLOMACY",
+            f"Sending aid to other settlement.",
+            target_entity=target_tile
+        )
         # Use new payload system to handle supplies sharing and relationship update
         # Inject temporary destination tile on self tile, so payload event can be handled by TriggerEventFromLibrary
         self.entity.tile.temp_dest = target_tile

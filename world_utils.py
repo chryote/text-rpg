@@ -1,4 +1,5 @@
 # directory world_utils.py
+import sys
 
 from tile_state import TileState
 from worldgen import GetNeighborsRadius
@@ -222,7 +223,12 @@ def _get_entity_info(entity):
         name = entity.get("economy", {}).get("name") if entity.get("economy") else entity.id
     else:
         # Assume it's a TileState if it doesn't have .get
-        name = getattr(entity, 'terrain', 'Tile')
+        if entity.entities:
+            first_entity = entity.entities[0]
+            # The Entity class stores the ID directly as an attribute (.id)
+            name = first_entity.id
+        else:
+            name = getattr(entity, 'terrain', 'Tile')
 
     # Safely get coordinates
     if hasattr(entity, 'tile') and entity.tile:

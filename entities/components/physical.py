@@ -1,6 +1,7 @@
 # entities/components/physical.py
 
 from ..component import Component
+from world_utils import LogEntityEvent
 import json
 
 class PhysicalComponent(Component):
@@ -35,15 +36,22 @@ class PhysicalComponent(Component):
         if payload_comp:
             # Flavor trail
             try:
-                print(f"[DEBUG:PAYLOAD] Payload arrived on: ({tile.x}, {tile.y}) with destination: {payload_comp.destination}")
-                print(f"[DEBUG:PAYLOAD] Payload content: ({payload_comp.payload_data})")
+                LogEntityEvent(
+                    tile,
+                    "PAYLOAD",
+                    f"Payload arrived on: ({tile.x}, {tile.y}) with destination: {payload_comp.destination}. Payload content: {payload_comp.payload_data}",
+                )
                 # tile.add_tag("caravan_was_here")
             except:
                 pass
 
             # Destination check
             if (tile.x, tile.y) == payload_comp.destination:
-                print("[DEBUG:PAYLOAD] Payload arrived on final destination")
+                LogEntityEvent(
+                    tile,
+                    "PAYLOAD",
+                    f"Payload arrived on final destination {payload_comp.destination}",
+                )
                 payload_comp.on_arrival(tile)
                 self.entity.mark_for_removal = True
 

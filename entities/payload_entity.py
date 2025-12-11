@@ -3,6 +3,7 @@
 from .entity import Entity
 from .components.physical import PhysicalComponent
 from .components.action import ActionComponent
+from world_utils import LogEntityEvent
 
 class PayloadComponent:
     def __init__(self, source_tile, dest_tile, routes, payload_data, payload_power, sender_entity, entity):
@@ -31,26 +32,47 @@ class PayloadComponent:
         agent = getattr(tile, "agent", None)
         if agent:
             if "supplies" in self.payload_data:
-                print ("[DEBUG:PAYLOAD] UPDATING SUPPLIES BY: ]", self.payload_data["supplies"])
+                LogEntityEvent(
+                    tile,
+                    "PAYLOAD",
+                    f"Updating supplies by {self.payload_data['supplies']}",
+                )
                 agent.add_supplies(self.payload_data["supplies"] * self.payload_power, 1)
 
             if "wealth" in self.payload_data:
                 agent.add_wealth(self.payload_data["wealth"] * self.payload_power, 1)
 
             if "sub_commodities" in self.payload_data:
-                print("[DEBUG:PAYLOAD] ADDING SUB COMMODITIES: ", self.payload_data)
+                LogEntityEvent(
+                    tile,
+                    "PAYLOAD",
+                    f"Inspecting sub commodities from payload data: {self.payload_data['sub_commodities']}",
+                )
                 for cname, amt in self.payload_data["sub_commodities"].items():
-                    print("[DEBUG: PAYLOAD] INSPECTING COMMODITIES: ", cname, amt, self.payload_power)
+                    LogEntityEvent(
+                        tile,
+                        "PAYLOAD",
+                        f"Adding sub commodity {amt} {cname} multiplied by {self.payload_power} (payload power)",
+                    )
                     agent.add_sub_commodity(amt * self.payload_power, cname)
 
-        print ("[DEBUG:PAYLOAD] CHECKING TILE:", tile)
         # --- Relationship Integration ---
         for ent in list(tile.entities):
             rel = ent.components.get("relationship")
-            print ("[DEBUG:PAYLOAD] RELATIONSHIP:", rel, tile, self.sender_entity)
+            LogEntityEvent(
+                tile,
+                "PAYLOAD",
+                f"Inspecting relationship table {rel.to_json()}",
+            )
             if rel and self.sender_id:
                 delta = self.payload_data.get("relationship_mod", 0)
-                print("[DEBUG:PAYLOAD] DEBUG RELATIONSHIP DELTA:", rel, tile, self.payload_power)
+
+                LogEntityEvent(
+                    tile,
+                    "PAYLOAD",
+                    f"Change perceived relationship of {self.sender_id} to {int(delta * self.payload_power)}",
+                )
+
                 rel.modify(self.sender_id, int(delta * self.payload_power))
 
         # --- Tags / Flavor ---
@@ -60,11 +82,21 @@ class PayloadComponent:
 def CreatePayloadEntity(world, source_tile, dest_tile, payload_data, routes, sender_entity, power=1.0):
     """Factory for creating payload entities."""
 
-    print("[DEBUG:PAYLOAD] CREATING PAYLOAD: ",sender_entity)
-    print("[DEBUG:PAYLOAD] OBSERVING PAYLOAD SOURCE AND DESTINATION:", source_tile, dest_tile)
+    LogEntityEvent(
+        source_tile,
+        "PAYLOAD",
+        f"Create and observe payload.",
+        target_entity=dest_tile
+    )
 
     eid = f"payload_{source_tile.x}_{source_tile.y}_{dest_tile.x}_{dest_tile.y}"
-    print("[DEBUG:PAYLOAD] GENERATING EID :", eid)
+
+    LogEntityEvent(
+        source_tile,
+        "PAYLOAD",
+        f"Payload generated with entity_id (eid) {eid}.",
+        target_entity=dest_tile
+    )
     e = Entity(eid, "payload", source_tile)
 
     # Movement

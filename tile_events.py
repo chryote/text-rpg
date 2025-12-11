@@ -1,6 +1,6 @@
 # directory tile_events.py
 from typing import Dict, Any
-from world_utils import GetActiveTiles
+from world_utils import GetActiveTiles, LogEntityEvent
 from resource_catalog import GetResourcesByType, GetResourceType
 from world_index_store import world_index
 import json
@@ -123,7 +123,11 @@ def RegisterTileEvent(tile, event_name: str, duration: int, effects: Dict[str, A
     for tag in _get_event_tags(event_name):
         tile.add_tag(tag)
 
-    print(f"[Event] {name} gained '{event_name}' ({duration} ticks)")
+    LogEntityEvent(
+        tile,
+        "EVENT",
+        f"Gained '{event_name}' for {duration} ticks)",
+    )
 
 
 def TriggerTileEvents(world, macro=None, clock=None, region=None):
@@ -266,7 +270,11 @@ def TriggerEventFromLibrary(tile, event_name):
         return
 
     # ==== PAYLOAD EVENT ====
-    print("[DEBUG:PAYLOAD] PAYLOAD EVENT:", event_name)
+    LogEntityEvent(
+        tile,
+        "EVENT",
+        f"Triggering incoming event {event_name}.",
+    )
 
     # ---------------------------------------------
     # 1. Acquire world reference safely
@@ -321,7 +329,13 @@ def TriggerEventFromLibrary(tile, event_name):
 
     if route_entry:
         routes = route_entry["path"]
-        print(f"[DEBUG:PAYLOAD] Using trade route: {sender_id} → {receiver_id}")
+
+        LogEntityEvent(
+            tile,
+            "EVENT:PAYLOAD",
+            f"Using trade route: {sender_id} → {receiver_id}.",
+            target_entity=dest
+        )
     else:
         # -----------------------------------------
         # 5. Fallback: Bresenham-style straight line
@@ -336,7 +350,12 @@ def TriggerEventFromLibrary(tile, event_name):
             ny = int(round(sy + (dy - sy) * (i / steps)))
             routes.append(world[ny][nx])
 
-    print("[DEBUG:PAYLOAD] PAYLOAD PRESENT :", event_name)
+    LogEntityEvent(
+        tile,
+        "EVENT:PAYLOAD",
+        f"Payload event exist as {event_name}.",
+        target_entity=dest
+    )
     # Payload data presets
     if event_name == "trade_mission":
         payload_data = {"type": "trade_caravan", "supplies": 5, "wealth": 2, "sub_commodities": {}, "relationship_mod": 2}
@@ -354,7 +373,12 @@ def TriggerEventFromLibrary(tile, event_name):
             sender_entity = ent
             break
 
-    print("[DEBUG:PAYLOAD] CHECKING SENDER ENTITY ON TILE EVENTS : ", sender_entity)
+    LogEntityEvent(
+        tile,
+        "EVENT:PAYLOAD",
+        f"Checking sender entity on tile event.",
+        target_entity=dest
+    )
 
     payload = CreatePayloadEntity(world, tile, dest, payload_data, routes, sender_entity)
 
@@ -363,7 +387,12 @@ def TriggerEventFromLibrary(tile, event_name):
         tile.payloads = []
     tile.payloads.append(payload)
 
-    print(f"[DEBUG:PAYLOAD] {event_name} dispatched from ({tile.x},{tile.y}) → ({dest.x},{dest.y})")
+    LogEntityEvent(
+        tile,
+        "EVENT:PAYLOAD",
+        f"{event_name} dispatched from ({tile.x},{tile.y}) → ({dest.x},{dest.y}).",
+        target_entity=dest
+    )
 
 
 def ScheduleTileEvent(tile, event_name: str, start_tick: int):
