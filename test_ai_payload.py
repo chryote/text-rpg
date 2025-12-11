@@ -60,7 +60,7 @@ def main():
     meta = world[0][0].get_system("meta")
     meta["trade_links"] = trade_links
 
-    print ("some trade links:", trade_links[1646][0])
+    # print ("some trade links:", trade_links[1646][0])
 
     # Settlement economy + agents already created by:
     # InitializeSettlementEconomy

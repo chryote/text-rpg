@@ -1,7 +1,7 @@
 # entities/components/settlement_ai.py
 
 from ..component import Component
-from world_utils import GetTilesWithinRadius, GetNearestTileWithSystem
+from world_utils import GetTilesWithinRadius, GetNearestTileWithSystem, LogEntityEvent
 import behavior as bh  # your behavior.py (Node, Sequence, Selector, Status)
 import world_index_store
 
@@ -80,7 +80,8 @@ class SettlementAIComponent(Component):
 
                 # if econ["supplies"] < econ["population"] * 0.4:
                 if econ["supplies"] < 2:
-                    print("[DEBUG:DIPLOMACY] EMERGENCY SHORTAGE TRIGGERED")
+                    LogEntityEvent(entity, "DIPLOMACY", "Emergency shorage triggered.")
+
                     # emergency: request aid from nearest partner
                     if dip:
                         dip.request_aid(entity.tile.index.world if getattr(entity.tile, "index", None) else None,
@@ -165,7 +166,7 @@ class SettlementAIComponent(Component):
                     # Store destination for payload system if needed (TriggerEventFromLibrary handles this now)
                     entity.tile.temp_dest = target_tile
 
-                    print(f"[AI] RAIDS: Targeting {target_tile.pos} (Vulnerable)")
+                    LogEntityEvent(entity, "[AI] RAIDS", "Targeting " + target_tile.pos + "(Vulnerable).")
                     return bh.Status.SUCCESS
 
                 return bh.Status.FAILURE
@@ -206,7 +207,7 @@ class SettlementAIComponent(Component):
                         # 5. Add Flavor Tag to Self
                         entity.tile.add_tag("diplomatic_support")
 
-                        print(f"[AI] AID: Offering aid to {target_tile.pos} (Crisis)")
+                        LogEntityEvent(entity, "[AI] AID", "Offering aid to " + target_tile.pos + "(Crisis).")
                         # Clear memory entry after action
                         del mem.short[aid_request_key]
                         return bh.Status.SUCCESS
@@ -244,7 +245,8 @@ class SettlementAIComponent(Component):
                     # Trigger opportunistic raid event (seeks vulnerable target)
                     action.trigger_event("raid")
                     entity.tile.add_tag("seeking_dominance")
-                    print("[AI: AMBITION] Triggered RAID for expansion.")
+
+                    LogEntityEvent(entity, "[AI] AMBITION", "Triggered RAID for expansion.")
 
                 # If Cautious/Greedy, ambition manifests as hoarding wealth
                 else:
@@ -253,7 +255,7 @@ class SettlementAIComponent(Component):
                     ScheduleTileEvent(entity.tile, "market_boom",
                                       start_tick=entity.tile.get_system("economy").get("id", 0) % 5 + 1)
                     entity.tile.add_tag("hoarding_wealth")
-                    print("[AI: AMBITION] Triggered Market Boom for hoarding.")
+                    LogEntityEvent(entity, "[AI] AMBITION", "Triggered Market Boom for hoarding.")
 
                 return bh.Status.SUCCESS
 

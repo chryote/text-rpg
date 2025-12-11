@@ -209,3 +209,47 @@ def PrintWorldWithCoords(world):
             row_symbols.append(symbol)
 
         print(f"{y:02}  " + " ".join(row_symbols))
+
+
+def _get_entity_info(entity):
+    """Helper to extract standardized name and position string from an entity or tile."""
+    if not entity:
+        return {"name": "Unknown", "pos": "(N/A)"}
+
+    # Check if it's an entity object (has get() for components)
+    if hasattr(entity, 'get'):
+        # Attempt to get the settlement name or fall back to entity ID/type
+        name = entity.get("economy", {}).get("name") if entity.get("economy") else entity.id
+    else:
+        # Assume it's a TileState if it doesn't have .get
+        name = getattr(entity, 'terrain', 'Tile')
+
+    # Safely get coordinates
+    if hasattr(entity, 'tile') and entity.tile:
+        pos = f"({entity.tile.x},{entity.tile.y})"
+    elif hasattr(entity, 'x') and hasattr(entity, 'y'):
+        pos = f"({entity.x},{entity.y})"
+    else:
+        pos = "(N/A)"
+
+    return {"name": name, "pos": pos}
+
+
+def LogEntityEvent(entity, event_type: str, message: str, target_entity=None):
+    """
+    Standardized logging function for entity-driven events, handling optional target entities.
+    Output format: [EVENT_TYPE] Source Name (x,y) [-> Target Name (x,y)]: Message
+    """
+    source_info = _get_entity_info(entity)
+
+    # Start with the basic source log
+    log_parts = [f"[{event_type.upper()}]", f"{source_info['name']} {source_info['pos']}"]
+
+    # Add target information if provided
+    if target_entity:
+        target_info = _get_entity_info(target_entity)
+        log_parts.append(f"-> {target_info['name']} {target_info['pos']}")
+
+    log_parts.append(f": {message}")
+
+    print(" ".join(log_parts))

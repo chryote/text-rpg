@@ -1,6 +1,6 @@
 # entities/components/diplomacy.py
 from ..component import Component
-from world_utils import GetNearestTileWithSystem, GetActiveTiles
+from world_utils import GetNearestTileWithSystem, GetActiveTiles, LogEntityEvent
 import world_index_store
 
 class DiplomacyComponent(Component):
@@ -33,7 +33,12 @@ class DiplomacyComponent(Component):
         if not partner:
             return False
 
-        print ("[DEBUG:DIPLOMACY] PARTNER DATA: ", partner)
+        LogEntityEvent(
+            self.entity,
+            "DIPLOMACY",
+            f"Found nearest partner tile. Checking for aid request broadcast.",
+            target_entity=partner
+        )
 
         # mark self asking for aid
         if not self.entity.tile.has_tag("aid_requested"):
