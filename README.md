@@ -11,7 +11,7 @@ This project is a high-fidelity text-based world simulation where story emerges 
 
 ## 💡 Core Philosophy: A Story Ecology
 
-Our goal is not realism, but **emergent novelty** [based on user motivation]. The world is treated as a single, reacting ecosystem where every action creates a ripple effect.
+Our goal is not realism, but **emergent novelty** . The world is treated as a single, reacting ecosystem where every action creates a ripple effect.
 
   * **Emergence over Scripting:** The simulation is designed to evolve through conflict and cooperation, producing unique storylines and narrative hooks without relying on traditional, pre-written plot lines.
   * **Meaningful Friction:** Systems are intentionally stylized and tuned for drama, ensuring the world is actively reacting to itself.
