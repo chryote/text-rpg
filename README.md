@@ -36,6 +36,7 @@ The codebase is built using a highly modular architecture based on industry-stan
 
 The project is structured around clear Python modules. The entry point is `main.py`.
 The entry point for AI test bed is `test_ai_payload.py`. The entry point for plotting simulation is `mock_simulation_plotting.py`.
+You might want to check `docs/ProjectVision.md` and `docs/ProjectStyleGuide.md` to better understand project scope.
 
 1.  **Run the Simulation:** Execute `main.py` to generate a seeded world, initialize all systems, attach AI agents, and run the time-based simulation loop.
 
