@@ -80,7 +80,7 @@ class SettlementAIComponent(Component):
 
                 # if econ["supplies"] < econ["population"] * 0.4:
                 if econ["supplies"] < 2:
-                    LogEntityEvent(entity, "DIPLOMACY", "Emergency shorage triggered.")
+                    LogEntityEvent(entity, "DIPLOMACY", "Emergency shortage triggered.")
 
                     # emergency: request aid from nearest partner
                     if dip:
