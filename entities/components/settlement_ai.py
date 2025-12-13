@@ -259,6 +259,85 @@ class SettlementAIComponent(Component):
 
                 return bh.Status.SUCCESS
 
+        # --- NEW BORDER EXPANSION / TILE CLAIMING LOGIC (Priority 7) ---
+
+        CLAIM_COST = 5.0  # Power projection cost to establish a claim
+        CLAIM_SUPPLIES_THRESHOLD = 0.8  # Must have supplies > 80% of population
+        CLAIM_RANGE = 3  # Search radius for unclaimed tiles
+
+        class CheckCanClaimTile(bh.Node):
+            def tick(self):
+                econ = entity.tile.get_system("economy")
+
+                if not econ:
+                    return bh.Status.FAILURE
+
+                # 1. Check Resources & Stability
+                power_proj = econ.get("power_projection", 0)
+                is_stable = econ["supplies"] > econ["population"] * CLAIM_SUPPLIES_THRESHOLD
+
+                if power_proj < CLAIM_COST or not is_stable:
+                    return bh.Status.FAILURE
+
+                # 2. Find Target: Look for nearby unclaimed tiles
+                target_tile = None
+
+                # Use a specific scan for tiles within the claim radius
+                world = entity.tile.index.world if getattr(entity.tile, "index", None) else None
+                if not world:
+                    return bh.Status.FAILURE
+
+                # Note: This relies on GetTilesWithinRadius being available
+                for n_tile in GetTilesWithinRadius(world, entity.tile.x, entity.tile.y, radius=CLAIM_RANGE):
+                    # Check if tile is valid (not self, not water/mountain)
+                    if n_tile is entity.tile or n_tile.terrain in ["water", "mountain"]:
+                        continue
+
+                    claim_system = n_tile.get_system("claim")
+                    if claim_system:
+                        # Skip if already claimed
+                        continue
+
+                    # Target found! (Simple rule: claim the first available neutral tile)
+                    target_tile = n_tile
+                    break
+
+                if target_tile:
+                    # Store the target for the action node
+                    entity.tile.temp_claim_target = target_tile
+                    return bh.Status.SUCCESS
+
+                return bh.Status.FAILURE
+
+        class ExecuteClaimAction(bh.Node):
+            def tick(self):
+                econ = entity.tile.get_system("economy")
+                target_tile = getattr(entity.tile, "temp_claim_target", None)
+
+                if not target_tile:
+                    return bh.Status.FAILURE
+
+                # 1. Spend Power Projection
+                econ["power_projection"] = econ.get("power_projection", 0) - CLAIM_COST
+                LogEntityEvent(entity, "AI:EXPANSION", f"Spent {CLAIM_COST} PP to claim {target_tile.pos}.")
+
+                # 2. Establish Claim System on Target Tile (Sub-settlement data)
+                target_tile.attach_system("claim", {
+                    "owner_id": entity.id,
+                    "power_projection": 1.0,  # Claim strength (can be increased later)
+                    "is_sub_settlement": True,
+                    "supplies_bonus": 0.5,  # Small base supplies bonus
+                })
+
+                # 3. Add Flavor Tag
+                entity.tile.add_tag("territorial_expansion")
+
+                # 4. Cleanup temp data
+                if hasattr(entity.tile, "temp_claim_target"):
+                    del entity.tile.temp_claim_target
+
+                return bh.Status.SUCCESS
+
         # Compose BT
         root = bh.Selector([
             bh.Sequence([CheckThreat(), DefendAction()]),  # Priority 1: DEFEND
@@ -267,6 +346,7 @@ class SettlementAIComponent(Component):
             bh.Sequence([CheckSupplyCrisis(), HandleSupplyAction()]),  # Priority 4: SELF-HELP (if raid/aid failed)
             bh.Sequence([CheckProsperity(), CelebrateAction()]), # Priority 5 : Handle prosperity
             bh.Sequence([CheckAmbitiousState(), HandleAmbitiousAction()]), # Priority 6: Handle Ambition
+            bh.Sequence([CheckCanClaimTile(), ExecuteClaimAction()]),  # 📌 NEW Priority 7: CLAIM TILE
             Idle()
         ])
         # attach onto AI component (entity.get("ai").behavior_tree)
@@ -278,14 +358,21 @@ class SettlementAIComponent(Component):
     def update(self, world):
         """
         High level update:
-          - perception & memory recording (some already in PerceptionComponent)
+          - power projection initialization & claim maintenance
+          - supplies bonus calculation from sub-settlements/claims
+          - perception & memory recording
           - emotions updated automatically via emotion component
           - ensure BT exists and let AIComponent.tick() run it
         """
         tile = self.entity.tile
         econ = tile.get_system("economy")
+        entity = self.entity
         if not econ:
             return
+
+        # 📌 NEW: Initialize Power Projection if missing (for demo/stability)
+        if "power_projection" not in econ:
+            econ["power_projection"] = 10.0  # Starting PP
 
         # ensure subcomponents exist
         mem = self.entity.get("memory")
@@ -293,6 +380,48 @@ class SettlementAIComponent(Component):
         dip = self.entity.get("diplomacy")
         action = self.entity.get("action")
         ai = self.entity.get("ai")
+
+        # -----------------------------------------------------------------
+        # 📌 NEW: Claim Maintenance and Supplies Bonus (High-Priority Update)
+        # -----------------------------------------------------------------
+
+        CLAIM_MAINTENANCE_COST_PER_TICK = 0.05
+        MAINTENANCE_RADIUS = 5
+        owned_claims_bonus = 0.0
+
+        try:
+            # Check tiles within radius (assuming claims are nearby for local calculation)
+            nearby_tiles = GetTilesWithinRadius(entity.tile.index.world, tile.x, tile.y, radius=MAINTENANCE_RADIUS)
+
+            for n_tile in nearby_tiles:
+                claim = n_tile.get_system("claim")
+
+                if claim and claim.get("owner_id") == entity.id:
+                    # 1. Maintenance Cost (Drain Power Projection for upkeep)
+                    econ["power_projection"] = econ.get("power_projection", 0) - CLAIM_MAINTENANCE_COST_PER_TICK
+
+                    # 2. Check for loss of claim
+                    if econ.get("power_projection", 0) <= 0:
+                        n_tile.systems.pop("claim", None)  # Remove the claim system
+                        LogEntityEvent(entity, "[AI] BORDER", f"Lost claim on {n_tile.pos} (No PP).")
+                    else:
+                        # 3. Apply Supplies Bonus (only if claim is maintained)
+                        bonus = claim.get("supplies_bonus", 0.0)
+                        owned_claims_bonus += bonus
+
+                        # Add tag to indicate it's an active sub-settlement
+                        n_tile.add_tag("sub_settlement")
+
+        except Exception:
+            # Safely fail if indexing or world is not fully initialized
+            pass
+
+        # Apply the total bonus to the owner's supplies
+        if owned_claims_bonus > 0.0:
+            econ["supplies"] = econ.get("supplies", 0) + owned_claims_bonus
+            # LogEntityEvent(entity, "[AI] BORDER", f"Gained {owned_claims_bonus:.2f} supplies from claims.")
+
+        # -----------------------------------------------------------------
 
         # 1) record economics into memory for trend detection
         if mem:
