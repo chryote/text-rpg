@@ -7,6 +7,8 @@
 
 This project is a high-fidelity text-based world simulation where story emerges bottom-up from the complex interactions of world systems and autonomous agents. We focus on **meaningful friction** and **dynamic evolution**, not handcrafted quests.
 
+This repository is a sandbox for experimenting with narrative instability and emotion models. Multiple implementations may coexist. Not all approaches reflect the author’s preferred or final design.
+
 -----
 
 ## 💡 Core Philosophy: A Story Ecology
