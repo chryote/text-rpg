@@ -68,6 +68,9 @@ def CreateWorld(world_time = None, master_seed = 12345):
     # This ensures resources reflect final tiles (used by InitializeSettlementEconomy).
     world = ComputeSoilAndResources(world, rng)
 
+    # Calculate and attach geo_pressure for NPC tendency forming
+    world = ComputeGeoPressure(world, rng)
+
     world = SeedFloraFauna(world, rng)
     world = ConvertBiotaToCounts(world)
     world = InitializeEcosystemFromBiota(world, rng)

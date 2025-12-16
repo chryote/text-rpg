@@ -544,6 +544,57 @@ def ComputeSoilAndResources(world, rng):
     return world
 
 
+def ComputeGeoPressure(world, rng):
+    """Calculates and attaches the 'geo_pressure' system to each tile."""
+    for row in world:
+        for tile in row:
+            # --- Derive Inputs ---
+            fertility = tile.get_system("soil").get("fertility", 0.5)
+            cost = tile.movement_cost if tile.movement_cost is not None else 1.0
+            elev = float(tile.elevation)
+            temp = tile.get_system("climate_map").get("temperature", 15.0)
+
+            # --- Calculation (Example Logic) ---
+
+            # Resource Stability: High fertility = high stability (1=max, -1=min)
+            resource_stability = round((fertility * 2) - 1.0, 3)
+
+            # Environmental Threat: Extreme weather, high elevation (0=min, 1=max)
+            elev_threat = max(0.0, elev - 0.5) * 1.0
+            temp_threat = (abs(temp - 15.0) / 15.0) * 0.5  # Deviation from mild 15C
+            environmental_threat = round(min(1.0, elev_threat + temp_threat), 3)
+
+            # Mobility Constraint: High movement cost = high constraint (0=min, 1=max)
+            # Movement cost is 1 (plains) to 4 (mountain/deep_water)
+            mobility_constraint = round(min(1.0, max(0.0, (cost - 1.0) / 3.0)), 3)
+
+            # Population Density: Checks for settlement presence (1=max, -1=min)
+            density_val = 0.0
+            if tile.terrain == "settlement":
+                density_val = 0.8
+            population_density = round(min(1.0, max(-1.0, (density_val * 2) - 1.0)), 3)
+
+            # Isolation Level: Water bodies reduce isolation (1=max, -1=min)
+            isolation_val = 0.5
+            if tile.terrain in ["coastal", "riverside"] or tile.has_tag("river"):
+                isolation_val -= 0.5
+            isolation_level = round(min(1.0, max(-1.0, (isolation_val * 2) - 1.0)), 3)
+
+            # --- Final Attachment ---
+            geo_pressure = {
+                "resource_stability": resource_stability,
+                "environmental_threat": environmental_threat,
+                "mobility_constraint": mobility_constraint,
+                "population_density": population_density,
+                "isolation_level": isolation_level,
+            }
+
+            # Use the standard method to integrate the data
+            tile.attach_system("geo_pressure", geo_pressure)
+
+    return world
+
+
 # --- Smooth biome derivation using continuous temp + rainfall -------------
 def DeriveBiomeFromClimate(world,
                             temp_thresholds=None,
