@@ -98,10 +98,10 @@ def SimulateTrophicEcosystem(world, rng = None, world_time = 0, dt = 1.0):
     for y in range(height):
         for x in range(width):
             tile = world[y][x]
-            eco = tile["eco"]
+            eco = tile.get_system("eco")
             neighbors = GetNeighbors(world, x, y)
             for neighbor in neighbors:
-                n_eco = neighbor["eco"]
+                n_eco = neighbor.get_system("eco")
                 for key in ["herbivores", "carnivores"]:
                     diff = diffusion_rate * (n_eco[key] - eco[key])
                     eco[key] += diff * dt
@@ -163,15 +163,15 @@ def CheckAndTriggerEcoEvents(world, macro, clock, region=None):
         herbivores = eco.get("herbivores", 0)
         carnivores = eco.get("carnivores", 0)
 
-        # 🌿 Example trigger 1: bloom event
+        # Example trigger 1: bloom event
         if producers > 750 and not tile.has_tag("blooming"):
             TriggerEventFromLibrary(tile, "forest_bloom")
 
-        # 🐍 Example trigger 2: predator surge event
+        # Example trigger 2: predator surge event
         if carnivores / max(herbivores, 1) > 1.5:
             TriggerEventFromLibrary(tile, "predator_surge")
 
-        # 🪲 Example trigger 3: collapse due to imbalance
+        # Example trigger 3: collapse due to imbalance
         if herbivores < 5 and producers > 700:
             TriggerEventFromLibrary(tile, "ecological_collapse")
 
@@ -195,7 +195,7 @@ def RunHistorySimulation(world, rng, steps=200, sample_coords=(0, 59)):
 
         world = SimulateTrophicEcosystem(world, rng, tick)
         tile = world[y][x]
-        eco = tile["eco"]
+        eco = tile.get_system("eco")
         history["tick"].append(tick)
         history["producers"].append(eco["producers"])
         history["herbivores"].append(eco["herbivores"])

@@ -6,7 +6,7 @@ from world_index_store import world_index
 import json
 
 # -------------------------------------------------------------------
-# 🔖 1. Event Library
+# 1. Event Library
 # -------------------------------------------------------------------
 TILE_EVENT_LIBRARY: Dict[str, Dict[str, Any]] = {
     "market_boom": {
@@ -99,7 +99,7 @@ TILE_EVENT_LIBRARY: Dict[str, Dict[str, Any]] = {
 }
 
 # -------------------------------------------------------------------
-# 🧠 2. Core API
+# 2. Core API
 # -------------------------------------------------------------------
 def RegisterTileEvent(tile, event_name: str, duration: int, effects: Dict[str, Any], desc: str = ""):
     """
@@ -186,7 +186,7 @@ def TriggerTileEvents(world, macro=None, clock=None, region=None):
 
 
 # -------------------------------------------------------------------
-# ⚙️ 3. Internal Effect Logic
+# 3. Internal Effect Logic
 # -------------------------------------------------------------------
 def _clear_event_tags(tile, event_name):
     tag = TILE_EVENT_LIBRARY.get(event_name, {}).get("tag")
@@ -256,7 +256,7 @@ def _apply_tile_event_effects(tile, econ, effects):
 
 
 # -------------------------------------------------------------------
-# 💡 4. Helper for One-Line Trigger
+# 4. Helper for One-Line Trigger
 # -------------------------------------------------------------------
 def TriggerEventFromLibrary(tile, event_name):
     from entities.payload_entity import CreatePayloadEntity

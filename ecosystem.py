@@ -128,7 +128,7 @@ def SimulateEco(world, rng=None, world_time=0, dt=1.0):
 
         climate = tile.climate or "temperate"
 
-        # 1️⃣ Seasonal + climate adjustment
+        # Seasonal + climate adjustment
         phase, season_name = GetSeason(climate, world_time)
         eco["season"] = season_name
         seasonal_amp = 0.25
@@ -140,7 +140,7 @@ def SimulateEco(world, rng=None, world_time=0, dt=1.0):
         else:
             season_factor = 1 + seasonal_amp * math.sin(phase * math.pi)
 
-        # 2️⃣ Climate growth/mortality baseline
+        # Climate growth/mortality baseline
         if climate == "tropical":
             growth_mod = 1.2
             mortality_mod = 0.9
@@ -151,7 +151,7 @@ def SimulateEco(world, rng=None, world_time=0, dt=1.0):
             growth_mod = 1.0
             mortality_mod = 1.0
 
-        # 3️⃣ Weather influence
+        # Weather influence
         w_state = weather.get("state", "")
         if w_state == "rain":
             growth_mod *= 1.15
@@ -163,14 +163,14 @@ def SimulateEco(world, rng=None, world_time=0, dt=1.0):
             growth_mod *= 0.6
             mortality_mod *= 1.3
 
-        # 4️⃣ Humidity & soil fertility impact
+        # Humidity & soil fertility impact
         hum = humidity.get("current", 0.5)
         fert = soil.get("fertility", 0.5)
 
         growth_mod *= (0.7 + hum * 0.3)
         growth_mod *= (0.6 + fert * 0.4)
 
-        # 5️⃣ Trophic calculations
+        # Trophic calculations
         prod = eco["producers"]
         herb = eco["herbivores"]
         carn = eco["carnivores"]
@@ -192,7 +192,7 @@ def SimulateEco(world, rng=None, world_time=0, dt=1.0):
             - (0.02 * carn * mortality_mod)
         ) * dt
 
-        # 6️⃣ Controlled noise (reduced chaos)
+        # Controlled noise (reduced chaos)
         def eco_noise(scale=0.015):
             return rng.uniform(-scale, scale)
 
@@ -200,7 +200,7 @@ def SimulateEco(world, rng=None, world_time=0, dt=1.0):
         eco["herbivores"] = max(0.0, herb + d_herbivores + eco_noise() * herb)
         eco["carnivores"] = max(0.0, carn + d_carnivores + eco_noise() * carn)
 
-        # 7️⃣ Sync back to biota counts
+        # Sync back to biota counts
         flora = biota.get("flora", {})
         fauna = biota.get("fauna", {})
 
@@ -219,7 +219,7 @@ def SimulateEco(world, rng=None, world_time=0, dt=1.0):
         tile.attach_system("biota", {"flora": flora, "fauna": fauna})
         tile.attach_system("eco", eco)
 
-        # 8️⃣ Eco-risk descriptor → used by trade route risk
+        # Eco-risk descriptor → used by trade route risk
         carn_r = eco["carnivores"] / max(eco["herbivores"], 1)
         prod_r = eco["producers"] / max(K, 1)
 

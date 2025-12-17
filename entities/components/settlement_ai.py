@@ -370,7 +370,7 @@ class SettlementAIComponent(Component):
         if not econ:
             return
 
-        # 📌 NEW: Initialize Power Projection if missing (for demo/stability)
+        # NEW: Initialize Power Projection if missing (for demo/stability)
         if "power_projection" not in econ:
             econ["power_projection"] = 10.0  # Starting PP
 
@@ -382,7 +382,7 @@ class SettlementAIComponent(Component):
         ai = self.entity.get("ai")
 
         # -----------------------------------------------------------------
-        # 📌 NEW: Claim Maintenance and Supplies Bonus (High-Priority Update)
+        # NEW: Claim Maintenance and Supplies Bonus (High-Priority Update)
         # -----------------------------------------------------------------
 
         CLAIM_MAINTENANCE_COST_PER_TICK = 0.05
@@ -467,7 +467,7 @@ class SettlementAIComponent(Component):
         pop_weight = 0.5
 
         # ---------------------------------------------------------
-        # 🍼 BABY STEP 1 — "Daily Pulse" for Settlement Health
+        # BABY STEP 1 — "Daily Pulse" for Settlement Health
         # ---------------------------------------------------------
 
         # hunger condition
@@ -489,14 +489,14 @@ class SettlementAIComponent(Component):
                 tile.remove_tag("poor")
 
         # ---------------------------------------------------------
-        # 🍼 BABY STEP 2 — Simple Goal: Increase Supplies
+        # BABY STEP 2 — Simple Goal: Increase Supplies
         # ---------------------------------------------------------
 
         if supplies < pop * pop_weight:
             goals.push("increase_supplies")
 
         # ---------------------------------------------------------
-        # 🍼 BABY STEP 3 — Influence Sub-commodities
+        # BABY STEP 3 — Influence Sub-commodities
         # ---------------------------------------------------------
         subs = econ.get("sub_commodities", {})
 
@@ -513,7 +513,7 @@ class SettlementAIComponent(Component):
                     subs[name] += 0.1
 
         # ================================================================
-        # 🍼 BABY STEP 4 — Weather Reaction
+        # BABY STEP 4 — Weather Reaction
         # ================================================================
         weather = tile.get_system("weather")
 
@@ -535,7 +535,7 @@ class SettlementAIComponent(Component):
                     tile.remove_tag("water_crisis")
 
         # ================================================================
-        # 🍼 BABY STEP 5 — Neighbor Awareness
+        # BABY STEP 5 — Neighbor Awareness
         # ================================================================
         # detect nearby settlements and threats
         neighbors = GetTilesWithinRadius(world, tile.x, tile.y, radius=5)
@@ -565,7 +565,7 @@ class SettlementAIComponent(Component):
                 tile.remove_tag("empathetic")
 
         # ================================================================
-        # 🍼 BABY STEP 6 — Micro-Events
+        # BABY STEP 6 — Micro-Events
         # ================================================================
         # using the ActionComponent to trigger tile events
 
