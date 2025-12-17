@@ -73,6 +73,13 @@ class PayloadComponent:
                 abs(self.payload_data["wealth"]) * self.payload_power, 1
             )
 
+            pers = self.sender_entity.get("personality")
+            tend = self.sender_entity.get("tendency")
+
+            # Successful raid reinforces aggression & ambition
+            pers.traits["aggressive"] += 0.05 * max(0, tend.get("aggression"))
+            pers.traits["ambitious"] += 0.03
+
         # --- Relationship Integration ---
         for ent in list(tile.entities):
             rel = ent.components.get("relationship")
