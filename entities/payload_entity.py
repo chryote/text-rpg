@@ -57,6 +57,22 @@ class PayloadComponent:
                     )
                     agent.add_sub_commodity(amt * self.payload_power, cname)
 
+        # ------ Economy Integration for Raid Sender -----------
+        if self.payload_data.get("type") == "raid_party":
+            LogEntityEvent(
+                self.sender_entity.tile,
+                "PAYLOAD",
+                f"Adding {abs(self.payload_data["supplies"])} supplies and {abs(self.payload_data["wealth"])} wealth to raid sender.",
+            )
+            raid_sender_agent = getattr(self.sender_entity.tile, "agent", None)
+            # Check tile_events.py for raid_party type, since economic effect is negative we just need to make it positive
+            raid_sender_agent.add_supplies(
+                abs(self.payload_data["supplies"]) * self.payload_power, 1
+            )
+            raid_sender_agent.add_wealth(
+                abs(self.payload_data["wealth"]) * self.payload_power, 1
+            )
+
         # --- Relationship Integration ---
         for ent in list(tile.entities):
             rel = ent.components.get("relationship")

@@ -1,7 +1,7 @@
 # entities/components/settlement_ai.py
 
 from ..component import Component
-from world_utils import GetTilesWithinRadius, GetNearestTileWithSystem, LogEntityEvent
+from world_utils import GetTilesWithinRadius, GetNearestTileWithSystem, LogEntityEvent, GetActiveTiles
 import behavior as bh  # your behavior.py (Node, Sequence, Selector, Status)
 import world_index_store
 
@@ -136,10 +136,31 @@ class SettlementAIComponent(Component):
 
         class CheckAndExecuteRaid(bh.Node):
             def tick(self):
-                # 1. Check Self-Personality: Only act if Aggressive or Greedy
-                pers = entity.get("personality")
-                if pers.get("greedy") < 0.6 and pers.get("aggressive") < 0.6:
-                    return bh.Status.FAILURE
+                # 1. Check Self-Tendency: Only act if raid drive exceed threshold
+                tend = entity.get("tendency")
+                econ = entity.tile.get_system("economy")
+
+                # --- 1.1 Compute raid inclination ---
+                raid_drive = (
+                        tend.get("aggression") * 0.4 +
+                        tend.get("risk") * 0.3 +
+                        (-tend.get("social")) * 0.2 +
+                        (-tend.get("authority")) * 0.1
+                )
+
+                # --- 1.2 Contextual pressure modifiers ---
+                if econ and econ.get("supplies", 0) < econ.get("population", 1) * 0.6:
+                   raid_drive += 0.2  # desperation boost
+
+                # --- 1.3 Threshold check (soft) ---
+                if raid_drive < 0.25:
+                   return bh.Status.FAILURE
+
+                LogEntityEvent(
+                    entity.tile,
+                    "AI",
+                    f"Triggering raid action.",
+                )
 
                 # 2. Find Target: Look for nearby vulnerable settlements
                 target_tile = None

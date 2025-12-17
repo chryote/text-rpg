@@ -81,8 +81,8 @@ def main():
     econ = sender_tile.get_system("economy")
     # sender_tile.temp_dest = receiver_tile
     # sender_tile.world_reference = world
-    econ["supplies"] = 1   # critical low
-    econ["population"] = max(10, econ.get("population", 10))
+    econ["supplies"] = 40   # critical low
+    econ["population"] = max(100, econ.get("population", 100))
 
     print("\n=== BEFORE SIMULATION ===")
     show_info(sender_tile, "SENDER INITIAL")

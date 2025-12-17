@@ -368,7 +368,7 @@ def TriggerEventFromLibrary(tile, event_name):
         return 1
 
     else:  # raid
-        payload_data = {"type": "raid_party", "supplies": 0, "wealth": -8, "sub_commodities": {}, "relationship_mod": -10}
+        payload_data = {"type": "raid_party", "supplies": -5, "wealth": -5, "sub_commodities": {}, "relationship_mod": -5}
 
     # Find a sender settlement entity
     sender_entity = None
