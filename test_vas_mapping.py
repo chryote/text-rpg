@@ -1,82 +1,156 @@
-import pandas as pd  # Using pandas for clear tabular output
+import math
+import pandas as pd
 
 
-def map_vas_to_label(V, A, S):
+
+# Each emotion is represented as a fixed point in 3D space:
+# (Valence, Arousal, Sociality)
+# Not hard rules can be changed. just the map of emotional centers
+
+
+EMOTION_ANCHORS = {
+    "Love/Ecstasy":         ( 1.0, 0.6,  1.0),
+    "Excitement/Elation":   ( 0.9, 0.8, -0.5),
+    "Anger/Rage":           (-0.7, 1.0,  0.7),
+    "Fear/Terror":          (-0.8, 0.9, -0.9),
+    "Distress/Anxiety":     (-0.6, 0.7,  0.0),
+    "Disgust/Aversion":     (-0.5, 0.7, -0.9),
+    "Sadness/Grief":        (-0.7, 0.3, -0.2),
+    "Serenity/Contentment": ( 0.8, 0.1,  0.5),
+    "Calmness/Apathy":      ( 0.0, 0.0,  0.0),
+    "Relaxation":           ( 0.3, 0.1,  0.2),
+    "Boredom/Dullness":     (-0.3, 0.1, -0.3),
+    "Interest/Ambivalence": ( 0.0, 0.4,  0.0),
+}
+
+
+
+# Radial Basis Function (Gaussian)
+
+# Converts a distance into an activation strength.
+
+# distance == 0  -> activation == 1.0
+# farther away   -> activation smoothly decays toward 0
+
+# sigma controls "emotion spread":
+#   smaller sigma -> sharper emotions
+#   larger sigma   -> more blending
+#   sigma represents what is essentially a gravity well.
+
+def gaussian_rbf(distance_from_anchor, sigma=0.35):
     """
-    Maps a continuous VAS vector (V, A, S) to a discrete emotion label
-    based on simple IF/ELSE boundaries derived from the VAS model document (VAS.pdf).
-    V: Valence (-1 to +1), A: Arousal (0 to 1), S: Sociality (-1 to +1).
+    Computes Gaussian RBF activation for a given distance.
+    """
+    return math.exp(
+        -(distance_from_anchor ** 2) / (2 * sigma ** 2)
+    )
+
+
+# Euclidean distance in VAS space
+#
+# measures how far the agent's current emotional state is from a given emotion anchor.
+
+def euclidean_distance(agent_vas_point, emotion_anchor_point):
+    """
+    Computes Euclidean distance between two VAS vectors.
     """
 
-    # 1. High Arousal, Strong Emotions (V > 0.7 or V < -0.7)
-    if A > 0.6:
-        if V > 0.7:
-            # High V (+1.0), High A (0.6), High S (+1.0) -> Love/Ecstasy
-            if S > 0.5:
-                return "Love/Ecstasy"
-            # High V (+1.0), High A (0.6), Low S (-1.0) -> Elation/Excitement (non-social)
-            else:
-                return "Excitement/Elation"
-        elif V < -0.7:
-            # Low V (-0.7), High A (1.0), High S (+0.7) -> Anger/Rage
-            if S > 0.5:
-                return "Anger/Rage"
-            # Low V (-0.7), High A (1.0), Low S (-0.9) -> Fear/Terror
-            elif S < -0.5:
-                return "Fear/Terror"
-            else:
-                return "Distress/Anxiety"
+    squared_differences = []
 
-    # 2. Moderate/Low Arousal, Strong Valence (V > 0.7 or V < -0.7)
-    # A <= 0.6 (Low/Moderate Arousal)
-    if V > 0.7:
-        # High V (+1.0), Low A (0.0) -> Serenity/Contentment
-        return "Serenity/Contentment"
-    elif V < -0.7:
-        # Low V (-0.7), Low A (0.3) -> Sadness/Grief
-        return "Sadness/Grief"
+    # Pair each axis (V, A, S) between agent and anchor
+    for agent_value, anchor_value in zip(agent_vas_point, emotion_anchor_point):
+        difference = agent_value - anchor_value
+        squared_differences.append(difference ** 2)
 
-    # 3. Moderate Valence / Neutral (Valence between -0.7 and 0.7)
+    # Distance = sqrt(sum of squared axis differences)
+    return math.sqrt(sum(squared_differences))
 
-    # Check for Disgust/Aversion (V is mid-negative, A is moderate, S is avoid)
-    if V < -0.4 and A >= 0.5 and S < -0.7:
-        # Disgust: (-0.5, 0.7, -0.9)
-        return "Disgust/Aversion"
 
-    # Neutral/Calm/Boredom
-    if A < 0.3:
-        # Low Arousal -> Calmness or Apathy
-        if -0.2 <= V <= 0.2:
-            return "Calmness/Apathy"
-        elif V > 0.2:
-            return "Relaxation"
-        else:
-            return "Boredom/Dullness"
 
-    # Default/Uncategorized (e.g., moderate activation, moderate valence, neutral sociality)
-    return "Interest/Ambivalence"
+# Core RBF emotion distribution
+# Output example:
+# {
+#   "Fear/Terror": 0.42,
+#   "Distress/Anxiety": 0.31,
+# }
 
+
+def map_vas_rbf_distribution(
+    valence,
+    arousal,
+    sociality,
+    sigma=0.35
+):
+    """
+    Maps a VAS point to a normalized emotion probability distribution.
+    """
+
+    agent_vas_point = (valence, arousal, sociality)
+    emotion_activations = {}
+
+    # Compute RBF activation for each emotion anchor
+    for emotion_label, anchor_point in EMOTION_ANCHORS.items():
+
+        distance_to_anchor = euclidean_distance(
+            agent_vas_point,
+            anchor_point
+        )
+
+        activation_strength = gaussian_rbf(
+            distance_to_anchor,
+            sigma
+        )
+
+        emotion_activations[emotion_label] = activation_strength
+
+    # Normalize activations so they sum to 1.0
+    total_activation = sum(emotion_activations.values())
+
+    for emotion_label in emotion_activations:
+        emotion_activations[emotion_label] /= total_activation
+
+    return emotion_activations
+
+
+
+# replacement for original IF/ELSE mapper.
+# Keeps the same function name and signature.
+# Returns the strongest emotion label.
+
+
+def map_vas_to_label(valence, arousal, sociality):
+    """
+    Returns the dominant emotion label using RBF competition.
+    """
+
+    emotion_distribution = map_vas_rbf_distribution(
+        valence,
+        arousal,
+        sociality
+    )
+
+    # Choose the emotion with the highest activation
+    return max(
+        emotion_distribution,
+        key=emotion_distribution.get
+    )
+
+
+
+# Test. Unchanged Logically
 
 def main():
-    """Defines and runs a series of tests for the VAS emotion mapping."""
+    """Runs validation tests against known VAS cases."""
 
-    # Test cases including the anchors from the VAS.pdf document.
     test_cases = [
-        # Anchor Emotions (from VAS.pdf, page 1)
-        {"V": 1.0, "A": 0.6, "S": 1.0, "Name": "Love (Anchor)", "Expected": "Love/Ecstasy"},  # Love: (+1.0, 0.6, +1.0)
-        {"V": -0.7, "A": 1.0, "S": 0.7, "Name": "Anger (Anchor)", "Expected": "Anger/Rage"},  # Anger: (-0.7, 1.0, +0.7)
-        {"V": -0.5, "A": 0.7, "S": -0.9, "Name": "Disgust (Anchor)", "Expected": "Disgust/Aversion"},
-        # Disgust: (-0.5, 0.7, -0.9)
-
-        # Case Study Example (from VAS.pdf, page 3-4)
-        {"V": -0.18, "A": 0.42, "S": -0.028, "Name": "Case Study Outcome (Annoyance)",
-         "Expected": "Interest/Ambivalence"},  # V=-0.18, A=0.42, S=-0.028
-
-        # Other Key Emotion Quadrants
-        {"V": 0.8, "A": 0.1, "S": 0.5, "Name": "Serenity", "Expected": "Serenity/Contentment"},  # High V, Low A
-        {"V": 0.0, "A": 0.0, "S": 0.0, "Name": "Neutral Calm", "Expected": "Calmness/Apathy"},  # Neutral V, Low A
-        {"V": -0.9, "A": 0.9, "S": -0.9, "Name": "Terror/Fear", "Expected": "Fear/Terror"},  # Low V, High A, Avoid S
-        {"V": -0.8, "A": 0.3, "S": -0.2, "Name": "Grief/Sadness", "Expected": "Sadness/Grief"},  # Low V, Low A
+        {"V": 1.0,  "A": 0.6, "S": 1.0,   "Name": "Love (Anchor)",        "Expected": "Love/Ecstasy"},
+        {"V": -0.7, "A": 1.0, "S": 0.7,   "Name": "Anger (Anchor)",       "Expected": "Anger/Rage"},
+        {"V": -0.5, "A": 0.7, "S": -0.9,  "Name": "Disgust (Anchor)",     "Expected": "Disgust/Aversion"},
+        {"V": -0.18,"A": 0.42,"S": -0.028,"Name": "Annoyance Case",       "Expected": "Interest/Ambivalence"},
+        {"V": 0.8,  "A": 0.1, "S": 0.5,   "Name": "Serenity",             "Expected": "Serenity/Contentment"},
+        {"V": 0.0,  "A": 0.0, "S": 0.0,   "Name": "Neutral Calm",         "Expected": "Calmness/Apathy"},
+        {"V": -0.9, "A": 0.9, "S": -0.9,  "Name": "Terror/Fear",          "Expected": "Fear/Terror"},
+        {"V": -0.8, "A": 0.3, "S": -0.2,  "Name": "Grief/Sadness",        "Expected": "Sadness/Grief"},
     ]
 
     results = []
@@ -84,44 +158,42 @@ def main():
     print("--- Running VAS Emotion Mapping Tests ---\n")
 
     for case in test_cases:
-        V, A, S = case["V"], case["A"], case["S"]
+        valence = case["V"]
+        arousal = case["A"]
+        sociality = case["S"]
 
-        # Run the function
-        actual_label = map_vas_to_label(V, A, S)
+        predicted_label = map_vas_to_label(
+            valence,
+            arousal,
+            sociality
+        )
 
-        # Determine if the test passed
-        is_pass = actual_label == case["Expected"]
-
-        # Store results
         results.append({
             "Test Case": case["Name"],
-            "V": V,
-            "A": A,
-            "S": S,
+            "V": valence,
+            "A": arousal,
+            "S": sociality,
             "Expected Label": case["Expected"],
-            "Actual Label": actual_label,
-            "Status": "PASS" if is_pass else f"FAIL (Got: {actual_label})"
+            "Actual Label": predicted_label,
+            "Status": "PASS" if predicted_label == case["Expected"]
+                      else f"FAIL (Got: {predicted_label})"
         })
 
-    # Print results in a table
     df = pd.DataFrame(results)
 
-    # Set display options for full table visibility
-    pd.set_option('display.max_rows', None)
-    pd.set_option('display.max_columns', None)
-    pd.set_option('display.width', 1000)
+    pd.set_option("display.max_rows", None)
+    pd.set_option("display.max_columns", None)
+    pd.set_option("display.width", 1000)
 
     print(df.to_string(index=False))
 
-    # Summary
-    failed_count = len(df[df['Status'].str.startswith('FAIL')])
-    total_count = len(df)
+    failed_tests = df["Status"].str.startswith("FAIL").sum()
 
-    print(f"\n--- Test Summary ---")
-    print(f"Total Tests Run: {total_count}")
-    print(f"Total Tests Passed: {total_count - failed_count}")
-    print(f"Total Tests Failed: {failed_count}")
-    print(f"Result: {'SUCCESS' if failed_count == 0 else 'FAILURE'}")
+    print("\n--- Test Summary ---")
+    print(f"Total Tests Run: {len(df)}")
+    print(f"Total Tests Passed: {len(df) - failed_tests}")
+    print(f"Total Tests Failed: {failed_tests}")
+    print(f"Result: {'SUCCESS' if failed_tests == 0 else 'FAILURE'}")
 
 
 if __name__ == "__main__":
