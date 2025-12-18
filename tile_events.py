@@ -254,6 +254,22 @@ def _apply_tile_event_effects(tile, econ, effects):
     if "eco_reset" in effects:
         tile.attach_system("eco", {"producers": 100, "herbivores": 10, "carnivores": 2})
 
+def find_trade_route(trade_links, sid_a, sid_b):
+    # direct
+    for link in trade_links.get(sid_a, []):
+        if link["partner"] == sid_b:
+            return link
+
+    # reverse (reuse path backwards)
+    for link in trade_links.get(sid_b, []):
+        if link["partner"] == sid_a:
+            return {
+                **link,
+                "path": list(reversed(link["path"]))
+            }
+
+    return None
+
 
 # -------------------------------------------------------------------
 # 4. Helper for One-Line Trigger
@@ -324,8 +340,10 @@ def TriggerEventFromLibrary(tile, event_name):
     meta = world[0][0].get_system("meta")
     trade_links = meta.get("trade_links", {})
 
-    paths = trade_links.get(sender_id, [])
-    route_entry = next((r for r in paths if r["partner"] == receiver_id), None)
+    # paths = trade_links.get(sender_id, [])
+    # route_entry = next((r for r in paths if r["partner"] == receiver_id), None)
+
+    route_entry = find_trade_route(trade_links, sender_id, receiver_id)
 
     if route_entry:
         routes = route_entry["path"]
@@ -340,7 +358,11 @@ def TriggerEventFromLibrary(tile, event_name):
         # -----------------------------------------
         # 5. Fallback: Bresenham-style straight line
         # -----------------------------------------
-        print("[payload] Trade route not found. Using fallback.")
+        LogEntityEvent(
+            tile,
+            "AI",
+            f"Trade route not found. Using fallback.",
+        )
         routes = []
         sx, sy = tile.x, tile.y
         dx, dy = dest.x, dest.y

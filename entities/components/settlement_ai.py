@@ -152,6 +152,16 @@ class SettlementAIComponent(Component):
                 if econ and econ.get("supplies", 0) < econ.get("population", 1) * 0.6:
                    raid_drive += 0.2  # desperation boost
 
+                LogEntityEvent(
+                    entity,
+                    "AI:RAID DECISION",
+                    f"drive={raid_drive:.2f} "
+                    f"(agg={tend.get('aggression'):.2f}, "
+                    f"risk={tend.get('risk'):.2f}, "
+                    f"social={tend.get('social'):.2f}, "
+                    f"auth={tend.get('authority'):.2f})"
+                )
+
                 # --- 1.3 Threshold check (soft) ---
                 if raid_drive < 0.25:
                    return bh.Status.FAILURE
@@ -177,6 +187,14 @@ class SettlementAIComponent(Component):
                         break
 
                 if target_tile:
+                    LogEntityEvent(
+                        entity.tile,
+                        "AI",
+                        f"Found valid raid target.",
+                        target_entity=target_tile
+
+                    )
+
                     # 3. Trigger Raid Payload
                     action = entity.get("action")
                     action.trigger_event("raid")  # Use "raid" which sends the payload
