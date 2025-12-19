@@ -166,18 +166,24 @@ def FindTradePartners(world, profiles, max_partners=3, search_radius=60):
             if complement_value == 0:
                 continue
 
-            # --- NEW: Affinity Factor (Favorable relationships boost score) ---
+            # --- REFACTORED: Affinity Factor (Using VAS Relationship Valence) ---
             entityB = get_settlement_ai(otile)
             if entityB and rel_comp_A:
-                rel_score = rel_comp_A.get(entityB.id)
-                # Maps [-100, 100] to a multiplier of [0.5, 1.5]
-                affinity_factor = 1.0 + (rel_score / 100) * 0.5
+                # Use the new get_rv method which returns a float between -1.0 and 1.0
+                #
+                rv_score = rel_comp_A.get_rv(entityB.id)
+
+                # Maps [-1.0, 1.0] to a multiplier of [0.5, 1.5]
+                # A neutral relationship (0.0) results in a 1.0 multiplier.
+                affinity_factor = 1.0 + (rv_score * 0.5)
             else:
                 affinity_factor = 1.0
 
             # --- NEW: Cautious Distance Penalty ---
-            # Penalty increases with distance (d_euc) and cautious trait value.
-            # Max Cautious is 1.0. Penalty ensures long routes are disfavored.
+            # (Note: Personality refactor also changes 'cautious' to 'anxiety_sensitivity' or similar,
+            # but if you keep 'cautious' as a custom trait, ensure it's pulled from the
+            # new PersonalityComponent)
+            cautious_trait = entityA.get("personality").get("anxiety_sensitivity")  # refactored trait
             cautious_penalty_factor = 1.0 + (cautious_trait * d_euc) / max(1.0, max_distance_proxy)
 
             # --- NEW: Final Score Calculation ---
@@ -448,7 +454,7 @@ def TagSettlements(world, profiles, routes):
             rel_comp = entityA.get("relationship")
             if rel_comp:
                 for score in rel_comp.table.values():
-                    if score < -50:  # Strong rivalry (potential conflict trigger)
+                    if score['rv'] < -0.5 and score['rs'] < -0.5:  # Strong rivalry (potential conflict trigger)
                         local_risk_score += 1
                         break  # Only need one hostile neighbor to trigger this factor
 

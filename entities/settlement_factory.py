@@ -11,10 +11,6 @@ from .components.emotion import EmotionComponent
 from .components.diplomacy import DiplomacyComponent
 from .components.relationship import RelationshipComponent
 from .components.tendency import TendencyComponent
-from .components.meta_emotion import MetaEmotionComponent
-from .components.meta_perception import MetaPerceptionComponent
-from .components.meta_personality import MetaPersonalityComponent
-from .components.meta_relationship import MetaRelationshipComponent
 
 
 def CreateSettlementAI(tile):
@@ -42,9 +38,5 @@ def CreateSettlementAI(tile):
     e.add_component(DiplomacyComponent())
     e.add_component(SettlementAIComponent())
     e.add_component(Tendency)
-    e.add_component(MetaEmotionComponent())
-    e.add_component(MetaPerceptionComponent())
-    e.add_component(MetaPersonalityComponent())
-    e.add_component(MetaRelationshipComponent())
     # tile.entities.append(e)
     return e

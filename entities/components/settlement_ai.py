@@ -24,30 +24,23 @@ class SettlementAIComponent(Component):
 
         class CheckThreat(bh.Node):
             def tick(self):
-                tile = entity.tile
-                # local neighbor scan
-                neigh = GetTilesWithinRadius(entity.tile.index.world, tile.x, tile.y, radius=5) if getattr(entity.tile,
-                                                                                                           "index",
-                                                                                                           None) else []
-                for n in neigh:
-                    if n is tile:
-                        continue
-                    if n.has_tag("bandit_settlement") or n.has_tag("predator_surge"):
-                        return bh.Status.SUCCESS
+                # Now uses the unified perception blackboard
+                perc = entity.get("perception")
+                if not perc: return bh.Status.FAILURE
+
+                # Check for high sensory intensity (SV) or negative intent (I_raw)
+                # indicating a perceived threat
+                if perc.blackboard.get("sv", 0) > 0.6 or perc.blackboard.get("i_raw", 0) < -0.4:
+                    return bh.Status.SUCCESS
                 return bh.Status.FAILURE
 
         class DefendAction(bh.Node):
             def tick(self):
-                # simple defend: raise fear emotion and stockpile supplies
-                action = entity.get("action")
+                # Uses unified emotion impulse system
                 emo = entity.get("emotion")
-                mem = entity.get("memory")
                 if emo:
-                    emo.mod("fear", 0.2)
-                if action:
-                    action.trigger_event("do_nothing")
-                    # action.add_supplies(1)  # small stockpile
-                # also set a fearful tag for narrative
+                    # High uncertainty and sensory impact increase arousal
+                    emo.apply_impulse(dv=-0.2, da=0.4, ds=-0.3)
                 entity.tile.add_tag("under_threat")
                 return bh.Status.SUCCESS
 
@@ -118,7 +111,7 @@ class SettlementAIComponent(Component):
                 emo = entity.get("emotion")
                 action = entity.get("action")
                 if emo:
-                    emo.mod("pride", 0.15)
+                    emo.apply_impulse(0.01, 0, 0)
                 if action:
                     action.trigger_event("do_nothing")
                     # action.trigger_event("festival")
@@ -212,10 +205,9 @@ class SettlementAIComponent(Component):
 
         class CheckAndExecuteAid(bh.Node):
             def tick(self):
-                # 1. Check Self-Personality: Only act if Cooperative
+                # 1. Uses unified personality traits
                 pers = entity.get("personality")
-                # if pers.get("cooperative") < 0.6:
-                if pers.get("cooperative") < 0.4:
+                if pers.get("agreeableness") < 0.6:  # Replaces 'cooperative'
                     return bh.Status.FAILURE
 
                 # 2. Check Self-Resources: Must have a surplus to give aid
@@ -263,13 +255,13 @@ class SettlementAIComponent(Component):
                 # Prosperity Check: Only act when healthy (Supplies are NOT in crisis)
                 is_stable = econ["supplies"] > econ["population"] * 0.8
 
-                # Ambition Check: Is the trait score above threshold?
-                is_ambitious = pers.get("ambitious") > 0.6
+                # Dominance Check: Is the trait score above threshold?
+                is_dominant = pers.get("dominance") > 0.6
 
                 # Wealth Check: Only invest ambition if there's wealth to risk
                 is_wealthy = econ.get("wealth", 0) > 150
 
-                if is_stable and is_ambitious and is_wealthy:
+                if is_stable and is_dominant and is_wealthy:
                     return bh.Status.SUCCESS
                 return bh.Status.FAILURE
 
@@ -280,7 +272,7 @@ class SettlementAIComponent(Component):
                 pers = entity.get("personality")
 
                 # If Aggressive, ambition manifests as expansion/raid
-                if pers.get("aggressive") > 0.7:
+                if pers.get("novelty") > 0.7 and pers.get("agreeableness") < 0.3:
                     # Trigger opportunistic raid event (seeks vulnerable target)
                     action.trigger_event("raid")
                     entity.tile.add_tag("seeking_dominance")
@@ -419,11 +411,9 @@ class SettlementAIComponent(Component):
         dip = self.entity.get("diplomacy")
         action = self.entity.get("action")
         ai = self.entity.get("ai")
-
-        meta_emo = self.entity.get("meta_emotion")
-        meta_perc = self.entity.get("meta_perception")
-        meta_pers = self.entity.get("meta_personality")
-        meta_rel = self.entity.get("meta_relationship")
+        perc = self.entity.get("perception")
+        pers = self.entity.get("personality")
+        rel = self.entity.get("relationship")
 
         # -----------------------------------------------------------------
         # NEW: Claim Maintenance and Supplies Bonus (High-Priority Update)
@@ -481,51 +471,58 @@ class SettlementAIComponent(Component):
 
         # --- STEP 0: Retrieve Perception Variables ---
         # These are now provided by the refactored PerceptionComponent
-        sv = meta_perc.blackboard.get("sv", 0.1)  # Sensory Intensity
-        i_raw = meta_perc.blackboard.get("i_raw", 0.0)  # Perceived Intent
-        u = meta_perc.blackboard.get("u", 0.1)  # Uncertainty
+        sv = perc.blackboard.get("sv", 0.1)  # Sensory Intensity
+        i_raw = perc.blackboard.get("i_raw", 0.0)  # Perceived Intent
+        u = perc.blackboard.get("u", 0.1)  # Uncertainty
+
+        scalar = 0.2
 
         # Attribution modifier (A_mod): Biased by personality 'agreeableness'
         # High agreeableness reduces negative attribution
-        a_mod = (meta_pers.get("agreeableness") - 0.5) * 0.2
+        a_mod = (pers.get("agreeableness") - 0.5) * 0.2
 
         # --- STEP 1: Compute Valence (V) ---
         # Formula: V = (1 - u)(I_raw + A_mod) + alpha * Rv
         alpha = 0.2  # Relationship weight coefficient
         rv = 0.0
         # If there's a specific target (e.g. nearest neighbor), pull Rv
-        neighbors = meta_perc.blackboard.get("neighbors", [])
+        neighbors = perc.blackboard.get("neighbors", [])
         target_id = None
-        if neighbors:
-            target_id = neighbors[0].entities[0].id  # Simplified for case study
-            rv = meta_rel.get_rv(target_id) if meta_rel else 0.0
 
-        v_impulse = (1 - u) * (i_raw + a_mod) + (alpha * rv)
+        for n in neighbors:
+            target_id = n.entities[0].id  # Simplified for case study
+            rv = rel.get_rv(target_id) if rel else 0.0
 
-        # --- STEP 2: Compute Arousal (A) ---
-        # Formula: A = SV(1 + u) + beta * Ra
-        # (Beta * Ra simplified here as internal tension)
-        a_impulse = sv * (1 + u)
+            v_impulse = (1 - u) * (i_raw + a_mod) + (alpha * rv)
 
-        # --- STEP 3: Compute Sociality (S) ---
-        # Formula: S = V + I_raw + dominance + Rs
-        # We use coefficients from the Case Study Example [cite: 5]
-        rs = meta_rel.get_rs(target_id) if meta_rel and neighbors else 0.0
-        dom_weight = 0.2
-        s_impulse = (0.6 * v_impulse) + (0.3 * i_raw) + (dom_weight * meta_pers.get("dominance"))
+            # --- STEP 2: Compute Arousal (A) ---
+            # Formula: A = SV(1 + u) + beta * Ra
+            # (Beta * Ra simplified here as internal tension)
+            a_impulse = sv * (1 + u)
 
-        # --- STEP 4: Trigger Emotion Update ---
-        # Apply the calculated impulses to the VAS vector
-        meta_emo.apply_impulse(v_impulse, a_impulse, s_impulse)
+            # --- STEP 3: Compute Sociality (S) ---
+            # Formula: S = V + I_raw + dominance + Rs
+            # We use coefficients from the Case Study Example
+            rs = rel.get_rs(target_id) if rel and neighbors else 0.0
+            dom_weight = 0.2
+            s_impulse = (0.6 * v_impulse) + (0.3 * i_raw) + (dom_weight * pers.get("dominance")) + rs
 
-        # --- STEP 5: Update Relationship Memory ---
-        # EMA Update: R' = 0.9R + 0.1E
-        if meta_rel and neighbors:
-            meta_rel.update_relationship(target_id, v_impulse, s_impulse)
+            v_delta = v_impulse * scalar
+            a_delta = a_impulse * scalar
+            s_delta = s_impulse * scalar
+
+            # --- STEP 4: Trigger Emotion Update ---
+            # Apply the calculated impulses to the VAS vector
+            emo.apply_impulse(v_delta, a_delta, s_delta)
+
+            # --- STEP 5: Update Relationship Memory ---
+            # EMA Update: R' = 0.9R + 0.1E
+            if rel and neighbors:
+                rel.update_relationship(target_id, v_impulse, s_impulse)
 
         # --- STEP 6: Logging Interpretation ---
-        label = meta_emo.get_current_label()
-        LogEntityEvent(entity, "AI:EMOTION VAS", f"State: {label} (V:{meta_emo.v:.2f}, A:{meta_emo.a:.2f}, S:{meta_emo.s:.2f})")
+        label = emo.get_current_label()
+        LogEntityEvent(entity, "AI:EMOTION VAS", f"State: {label} (V:{emo.v:.2f}, A:{emo.a:.2f}, S:{emo.s:.2f})")
 
         # 3) lazy-build behaviour tree (only once per entity)
         if not self._bt_built:

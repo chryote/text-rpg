@@ -380,17 +380,17 @@ def TriggerEventFromLibrary(tile, event_name):
     )
     # Payload data presets
     if event_name == "trade_mission":
-        payload_data = {"type": "trade_caravan", "supplies": 5, "wealth": 2, "sub_commodities": {}, "relationship_mod": 2}
+        payload_data = {"type": "trade_caravan", "supplies": 5, "wealth": 2, "sub_commodities": {}, "relationship_mod": 0.01}
 
     elif event_name == "send_aid":
-        payload_data = {"type": "aid_shipment", "supplies": 5, "wealth": 0, "sub_commodities": {"meat": 0.1}, "relationship_mod": 2}
+        payload_data = {"type": "aid_shipment", "supplies": 5, "wealth": 0, "sub_commodities": {"meat": 0.1}, "relationship_mod": 0.1}
 
     elif event_name == "spread_rumor":
         HandleSpreadRumor(world, tile.entities[0], routes)
         return 1
 
     else:  # raid
-        payload_data = {"type": "raid_party", "supplies": -5, "wealth": -5, "sub_commodities": {}, "relationship_mod": -5}
+        payload_data = {"type": "raid_party", "supplies": -5, "wealth": -5, "sub_commodities": {}, "relationship_mod": -0.1}
 
     # Find a sender settlement entity
     sender_entity = None

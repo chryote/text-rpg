@@ -135,16 +135,16 @@ class DiplomacyComponent(Component):
             rumor_type = "self_shortage_crisis"
             rumor_text = f"A grim rumor: {my_id} is facing a severe supply crisis and is becoming desperate."
             # A crisis might cause other settlements to be wary of me (negative mod)
-            rel_mod = -1.0
+            rel_mod = -0.01
         elif my_supplies > 50:
             rumor_type = "self_wealth_prosperity"
             rumor_text = f"Word of {my_id}'s booming economy and vast resources spreads."
             # Prosperity might cause respect (positive mod)
-            rel_mod = 1.0
+            rel_mod = 0.01
         else:
             rumor_type = "self_stable_trade"
             rumor_text = f"{my_id} is a reliable and steady trading hub."
-            rel_mod = 1.0  # Slightly positive/neutral modifier
+            rel_mod = 0.1  # Slightly positive/neutral modifier
 
         return rumor_type, rumor_text, rel_mod
 

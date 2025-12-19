@@ -77,8 +77,8 @@ class PayloadComponent:
             tend = self.sender_entity.get("tendency")
 
             # Successful raid reinforces aggression & ambition
-            pers.traits["aggressive"] += 0.05 * max(0, tend.get("aggression"))
-            pers.traits["ambitious"] += 0.03
+            pers.traits["dominance"] += 0.05 * max(0, tend.get("aggression"))
+            pers.traits["agreeableness"] -= 0.03
 
         # --- Relationship Integration ---
         for ent in list(tile.entities):
@@ -122,7 +122,7 @@ class PayloadComponent:
                         f"Rumor in effect : {self.payload_data['rumor_text']} → changing relationship {self.sender_id} to {change}",
                     )
 
-                rel.modify(self.sender_id, change)
+                rel.update_relationship(self.sender_id, current_v=change, current_s=change)
 
         # --- Tags / Flavor ---
         # tile.add_tag(f"payload_arrived_{self.payload_data.get('type','generic')}")
