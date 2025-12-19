@@ -122,7 +122,13 @@ class PayloadComponent:
                         f"Rumor in effect : {self.payload_data['rumor_text']} → changing relationship {self.sender_id} to {change}",
                     )
 
-                rel.update_relationship(self.sender_id, current_v=change, current_s=change)
+                v_change = self.payload_data.get("v_mod", self.payload_data.get("relationship_mod", 0))
+                s_change = self.payload_data.get("s_mod", self.payload_data.get("relationship_mod", 0))
+
+                final_v = v_change * self.payload_power
+                final_s = s_change * self.payload_power
+
+                rel.update_relationship(self.sender_id, current_v=final_v, current_s=final_s)
 
         # --- Tags / Flavor ---
         # tile.add_tag(f"payload_arrived_{self.payload_data.get('type','generic')}")

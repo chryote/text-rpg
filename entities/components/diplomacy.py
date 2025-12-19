@@ -136,17 +136,20 @@ class DiplomacyComponent(Component):
             rumor_text = f"A grim rumor: {my_id} is facing a severe supply crisis and is becoming desperate."
             # A crisis might cause other settlements to be wary of me (negative mod)
             rel_mod = -0.01
+            v_mod, s_mod = -0.05, 0.02
         elif my_supplies > 50:
             rumor_type = "self_wealth_prosperity"
             rumor_text = f"Word of {my_id}'s booming economy and vast resources spreads."
             # Prosperity might cause respect (positive mod)
             rel_mod = 0.01
+            v_mod, s_mod = 0.05, 0.0
         else:
             rumor_type = "self_stable_trade"
             rumor_text = f"{my_id} is a reliable and steady trading hub."
-            rel_mod = 0.1  # Slightly positive/neutral modifier
+            rel_mod = 0.01  # Slightly positive/neutral modifier
+            v_mod, s_mod = 0.01, 0.01
 
-        return rumor_type, rumor_text, rel_mod
+        return rumor_type, rumor_text, rel_mod, v_mod, s_mod
 
     def spread_rumor(self, world):
         """
@@ -165,7 +168,7 @@ class DiplomacyComponent(Component):
         # Randomly select a target to spread the rumor to.
         target_tile = random.choice(other_settlements)
 
-        rumor_type, rumor_text, rel_mod = self.get_rumor_content()
+        rumor_type, rumor_text, rel_mod, v_mod, s_mod = self.get_rumor_content()
 
         if not rumor_type:
             return False
@@ -174,6 +177,8 @@ class DiplomacyComponent(Component):
             # Use a distinct type for identification in PayloadComponent.on_arrival
             "type": "rumor_echo",
             "relationship_mod": rel_mod,  # The modifier to apply to the receiver's opinion of the sender
+            "v_mod": v_mod,
+            "s_mod": s_mod,
             "rumor_type": rumor_type,
             "rumor_text": rumor_text,
             # Rumor data could also include the "Belief" class info if you create one

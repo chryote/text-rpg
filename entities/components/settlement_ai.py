@@ -156,7 +156,7 @@ class SettlementAIComponent(Component):
                 )
 
                 # --- 1.3 Threshold check (soft) ---
-                if raid_drive < 0.25:
+                if raid_drive < 0.4:
                    return bh.Status.FAILURE
 
                 LogEntityEvent(
@@ -470,55 +470,47 @@ class SettlementAIComponent(Component):
                     emo.mod("fear", 0.08)
 
         # --- STEP 0: Retrieve Perception Variables ---
-        # These are now provided by the refactored PerceptionComponent
-        sv = perc.blackboard.get("sv", 0.1)  # Sensory Intensity
-        i_raw = perc.blackboard.get("i_raw", 0.0)  # Perceived Intent
-        u = perc.blackboard.get("u", 0.1)  # Uncertainty
+        # sv: sensory intensity [0,1], i_raw: perceived intent [-1,1], u: uncertainty [0,1]
+        sv = perc.blackboard.get("sv", 0.1)
+        i_raw = perc.blackboard.get("i_raw", 0.0)
+        u = perc.blackboard.get("u", 0.1)
 
-        scalar = 0.2
-
-        # Attribution modifier (A_mod): Biased by personality 'agreeableness'
+        # Attribution modifier (A_mod): biased by personality traits
         # High agreeableness reduces negative attribution
         a_mod = (pers.get("agreeableness") - 0.5) * 0.2
 
         # --- STEP 1: Compute Valence (V) ---
         # Formula: V = (1 - u)(I_raw + A_mod) + alpha * Rv
-        alpha = 0.2  # Relationship weight coefficient
-        rv = 0.0
-        # If there's a specific target (e.g. nearest neighbor), pull Rv
-        neighbors = perc.blackboard.get("neighbors", [])
-        target_id = None
+        alpha = 0.2  # weighting coefficient (0.1-0.3)
 
+        neighbors = perc.blackboard.get("neighbors", [])
         for n in neighbors:
-            target_id = n.entities[0].id  # Simplified for case study
+            if not n.entities: continue
+            target_id = n.entities[0].id
             rv = rel.get_rv(target_id) if rel else 0.0
 
-            v_impulse = (1 - u) * (i_raw + a_mod) + (alpha * rv)
+            # Formal Valence calculation
+            v_event = (1 - u) * (i_raw + a_mod) + (alpha * rv)
 
             # --- STEP 2: Compute Arousal (A) ---
             # Formula: A = SV(1 + u) + beta * Ra
-            # (Beta * Ra simplified here as internal tension)
-            a_impulse = sv * (1 + u)
+            # (Simplifying Ra as internal tension or 0 for now)
+            a_event = sv * (1 + u)
 
             # --- STEP 3: Compute Sociality (S) ---
             # Formula: S = V + I_raw + dominance + Rs
-            # We use coefficients from the Case Study Example
-            rs = rel.get_rs(target_id) if rel and neighbors else 0.0
-            dom_weight = 0.2
-            s_impulse = (0.6 * v_impulse) + (0.3 * i_raw) + (dom_weight * pers.get("dominance")) + rs
+            rs = rel.get_rs(target_id) if rel else 0.0
+            s_event = v_event + i_raw + pers.get("dominance") + rs
 
-            v_delta = v_impulse * scalar
-            a_delta = a_impulse * scalar
-            s_delta = s_impulse * scalar
+            # --- STEP 4: Apply Impulses ---
+            # Using a scalar to prevent instant maxing of vectors
+            scalar = 0.2
+            emo.apply_impulse(v_event * scalar, a_event * scalar, s_event * scalar)
 
-            # --- STEP 4: Trigger Emotion Update ---
-            # Apply the calculated impulses to the VAS vector
-            emo.apply_impulse(v_delta, a_delta, s_delta)
-
-            # --- STEP 5: Update Relationship Memory ---
-            # EMA Update: R' = 0.9R + 0.1E
-            if rel and neighbors:
-                rel.update_relationship(target_id, v_impulse, s_impulse)
+            # --- STEP 5: Update Relationship Memory EMA ---
+            # R'v = 0.9Rv + 0.1V | R's = 0.9Rs + 0.1S
+            if rel:
+                rel.update_relationship(target_id, v_event, s_event)
 
         # --- STEP 6: Logging Interpretation ---
         label = emo.get_current_label()
