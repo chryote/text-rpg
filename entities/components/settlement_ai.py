@@ -420,6 +420,13 @@ class SettlementAIComponent(Component):
         action = self.entity.get("action")
         ai = self.entity.get("ai")
 
+        meta_emo = self.entity.get("meta_emo")
+        meta_perc = self.entity.get("meta_perc")
+        meta_pers = self.entity.get("meta_pers")
+        meta_rel = self.entity.get("meta_rel")
+
+        print ("META", self.entity.components, self.entity.components["meta_emotion"])
+
         # -----------------------------------------------------------------
         # NEW: Claim Maintenance and Supplies Bonus (High-Priority Update)
         # -----------------------------------------------------------------
@@ -473,6 +480,54 @@ class SettlementAIComponent(Component):
             if w_state == "drought":
                 if emo:
                     emo.mod("fear", 0.08)
+
+        # --- STEP 0: Retrieve Perception Variables ---
+        # These are now provided by the refactored PerceptionComponent
+        sv = meta_perc.blackboard.get("sv", 0.1)  # Sensory Intensity
+        i_raw = meta_perc.blackboard.get("i_raw", 0.0)  # Perceived Intent
+        u = meta_perc.blackboard.get("u", 0.1)  # Uncertainty
+
+        # Attribution modifier (A_mod): Biased by personality 'agreeableness'
+        # High agreeableness reduces negative attribution
+        a_mod = (meta_pers.get("agreeableness") - 0.5) * 0.2
+
+        # --- STEP 1: Compute Valence (V) ---
+        # Formula: V = (1 - u)(I_raw + A_mod) + alpha * Rv
+        alpha = 0.2  # Relationship weight coefficient
+        rv = 0.0
+        # If there's a specific target (e.g. nearest neighbor), pull Rv
+        neighbors = meta_perc.blackboard.get("neighbors", [])
+        target_id = None
+        if neighbors:
+            target_id = neighbors[0].id  # Simplified for case study
+            rv = meta_rel.get_rv(target_id) if meta_rel else 0.0
+
+        v_impulse = (1 - u) * (i_raw + a_mod) + (alpha * rv)
+
+        # --- STEP 2: Compute Arousal (A) ---
+        # Formula: A = SV(1 + u) + beta * Ra
+        # (Beta * Ra simplified here as internal tension)
+        a_impulse = sv * (1 + u)
+
+        # --- STEP 3: Compute Sociality (S) ---
+        # Formula: S = V + I_raw + dominance + Rs
+        # We use coefficients from the Case Study Example [cite: 5]
+        rs = meta_rel.get_rs(target_id) if meta_rel and neighbors else 0.0
+        dom_weight = 0.2
+        s_impulse = (0.6 * v_impulse) + (0.3 * i_raw) + (dom_weight * meta_pers.get("dominance"))
+
+        # --- STEP 4: Trigger Emotion Update ---
+        # Apply the calculated impulses to the VAS vector
+        meta_emo.apply_impulse(v_impulse, a_impulse, s_impulse)
+
+        # --- STEP 5: Update Relationship Memory ---
+        # EMA Update: R' = 0.9R + 0.1E
+        if meta_rel and neighbors:
+            meta_rel.update_relationship(target_id, v_impulse, s_impulse)
+
+        # --- STEP 6: Logging Interpretation ---
+        label = meta_emo.get_current_label()
+        LogEntityEvent(entity, "EMOTION_VAS", f"State: {label} (V:{meta_emo.v:.2f}, A:{meta_emo.a:.2f}, S:{meta_emo.s:.2f})")
 
         # 3) lazy-build behaviour tree (only once per entity)
         if not self._bt_built:
