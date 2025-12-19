@@ -1,11 +1,11 @@
 # entities/components/meta_perception.py
 
 from ..component import Component
-from world_utils import GetTilesWithinRadius
+from world_utils import GetTilesWithinRadius, GetActiveTiles
 
 
 class MetaPerceptionComponent(Component):
-    def __init__(self, radius=3):
+    def __init__(self, radius=10):
         super().__init__("meta_perception")
         self.radius = radius
         # The blackboard now stores VAS-specific interpretation variables
@@ -19,7 +19,7 @@ class MetaPerceptionComponent(Component):
 
     def update(self, world):
         t = self.entity.tile
-        neighbors = GetTilesWithinRadius(world, t.x, t.y, self.radius)
+        neighbors = GetActiveTiles(world, "economy")
 
         # Reset intensities for the current pulse
         sv = 0.1  # Base ambient intensity

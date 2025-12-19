@@ -420,12 +420,10 @@ class SettlementAIComponent(Component):
         action = self.entity.get("action")
         ai = self.entity.get("ai")
 
-        meta_emo = self.entity.get("meta_emo")
-        meta_perc = self.entity.get("meta_perc")
-        meta_pers = self.entity.get("meta_pers")
-        meta_rel = self.entity.get("meta_rel")
-
-        print ("META", self.entity.components, self.entity.components["meta_emotion"])
+        meta_emo = self.entity.get("meta_emotion")
+        meta_perc = self.entity.get("meta_perception")
+        meta_pers = self.entity.get("meta_personality")
+        meta_rel = self.entity.get("meta_relationship")
 
         # -----------------------------------------------------------------
         # NEW: Claim Maintenance and Supplies Bonus (High-Priority Update)
@@ -499,7 +497,7 @@ class SettlementAIComponent(Component):
         neighbors = meta_perc.blackboard.get("neighbors", [])
         target_id = None
         if neighbors:
-            target_id = neighbors[0].id  # Simplified for case study
+            target_id = neighbors[0].entities[0].id  # Simplified for case study
             rv = meta_rel.get_rv(target_id) if meta_rel else 0.0
 
         v_impulse = (1 - u) * (i_raw + a_mod) + (alpha * rv)
@@ -527,7 +525,7 @@ class SettlementAIComponent(Component):
 
         # --- STEP 6: Logging Interpretation ---
         label = meta_emo.get_current_label()
-        LogEntityEvent(entity, "EMOTION_VAS", f"State: {label} (V:{meta_emo.v:.2f}, A:{meta_emo.a:.2f}, S:{meta_emo.s:.2f})")
+        LogEntityEvent(entity, "AI:EMOTION VAS", f"State: {label} (V:{meta_emo.v:.2f}, A:{meta_emo.a:.2f}, S:{meta_emo.s:.2f})")
 
         # 3) lazy-build behaviour tree (only once per entity)
         if not self._bt_built:
