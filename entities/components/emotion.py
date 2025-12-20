@@ -20,7 +20,7 @@ EMOTION_ANCHORS = {
 
 
 class EmotionComponent(Component):
-    def __init__(self, v=0.0, a=0.0, s=0.0, decay_rate=0.02, stacking_factor=1.0):
+    def __init__(self, v=0.0, a=0.0, s=0.0, decay_rate=0.02, stacking_factor=0.01):
         super().__init__("emotion")
         # VAS Dimensions: V [-1,1], A [0,1], S [-1,1]
         self.v = v
@@ -38,6 +38,17 @@ class EmotionComponent(Component):
         self.v = (self.v + dv) + (k * self.v)
         self.a = (self.a + da) + (k * self.a)
         self.s = (self.s + ds) + (k * self.s)
+
+        # Then apply stacking (growth based on current state)
+        # but only if the impulse is pushing in the same direction
+        if (dv > 0 and self.v > 0) or (dv < 0 and self.v < 0):
+            self.v += self.stacking_factor * self.v
+
+        if (da > 0 and self.a > 0) or (da < 0 and self.a < 0):
+            self.a += self.stacking_factor * self.a
+
+        if (ds > 0 and self.s > 0) or (ds < 0 and self.s < 0):
+            self.s += self.stacking_factor * self.s
 
         # Physical bounds clamping
         self.v = max(-1.0, min(1.0, self.v))

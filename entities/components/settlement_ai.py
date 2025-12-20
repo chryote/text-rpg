@@ -484,6 +484,7 @@ class SettlementAIComponent(Component):
         alpha = 0.2  # weighting coefficient (0.1-0.3)
 
         neighbors = perc.blackboard.get("neighbors", [])
+        total_v, total_a, total_s = 0, 0, 0
         for n in neighbors:
             if not n.entities: continue
             target_id = n.entities[0].id
@@ -500,17 +501,23 @@ class SettlementAIComponent(Component):
             # --- STEP 3: Compute Sociality (S) ---
             # Formula: S = V + I_raw + dominance + Rs
             rs = rel.get_rs(target_id) if rel else 0.0
-            s_event = v_event + i_raw + pers.get("dominance") + rs
+            dom_weight = 0.9  # Matches the Case Study logic
+            s_event = (0.6 * v_event) + (0.3 * i_raw) + (dom_weight * pers.get("dominance")) + rs
 
             # --- STEP 4: Apply Impulses ---
             # Using a scalar to prevent instant maxing of vectors
             scalar = 0.2
-            emo.apply_impulse(v_event * scalar, a_event * scalar, s_event * scalar)
+            total_v += v_event * scalar
+            total_a += a_event * scalar
+            total_s += s_event * scalar
 
             # --- STEP 5: Update Relationship Memory EMA ---
             # R'v = 0.9Rv + 0.1V | R's = 0.9Rs + 0.1S
             if rel:
-                rel.update_relationship(target_id, v_event, s_event)
+                scalar = 0.5
+                rel.update_relationship(target_id, v_event, s_event * scalar)
+
+        emo.apply_impulse(total_v, total_a, total_s)
 
         # --- STEP 6: Logging Interpretation ---
         label = emo.get_current_label()
