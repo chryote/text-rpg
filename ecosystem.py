@@ -119,6 +119,16 @@ def SimulateEco(world, rng=None, world_time=0, dt=1.0):
     height = len(world)
     width = len(world[0])
 
+    # Calculate these ONCE at the top of the function
+    phase_temp, season_temp = GetSeason("temperate", world_time)
+    temperate_seasonal_factor = 1 + 0.25 * math.sin(phase_temp * 4 * math.pi)
+
+    phase_trop, season_trop = GetSeason("tropical", world_time)
+    tropical_seasonal_factor = 1 + 0.25 * math.sin(phase_trop * 2 * math.pi)
+
+    phase_pol, season_pol = GetSeason("polar", world_time)
+    polar_seasonal_factor = 1 + 0.25 * math.sin(phase_pol * 2 * math.pi)
+
     for tile in GetActiveTiles(world, "eco"):
         eco = tile.ensure_system("eco", {"producers": 300, "herbivores": 60, "carnivores": 10})
         biota = tile.get_system("biota") or {}
@@ -128,17 +138,15 @@ def SimulateEco(world, rng=None, world_time=0, dt=1.0):
 
         climate = tile.climate or "temperate"
 
-        # Seasonal + climate adjustment
-        phase, season_name = GetSeason(climate, world_time)
-        eco["season"] = season_name
-        seasonal_amp = 0.25
-
         if climate == "temperate":
-            season_factor = 1 + seasonal_amp * math.sin(phase * 4 * math.pi)
+            season_factor = temperate_seasonal_factor
+            eco["season"] = season_temp
         elif climate == "tropical":
-            season_factor = 1 + seasonal_amp * math.sin(phase * 2 * math.pi)
+            season_factor = tropical_seasonal_factor
+            eco["season"] = season_trop
         else:
-            season_factor = 1 + seasonal_amp * math.sin(phase * math.pi)
+            season_factor = polar_seasonal_factor
+            eco["season"] = season_pol
 
         # Climate growth/mortality baseline
         if climate == "tropical":

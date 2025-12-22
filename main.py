@@ -26,6 +26,7 @@ from trade_routes import GenerateTradeRoutes, ApplyTradeEffects, UpdateTradeRout
 from trade_visual import PrintTradeRoutes, RenderTradeRouteMap
 from entities.update_all import UpdateAllEntities
 from world_state_director import DirectorController
+from world_utils import MeasureSimulationSpeed
 
 # --- Global variables
 world_time = 0
@@ -34,7 +35,7 @@ def CreateWorld(world_time = None, master_seed = 12345):
     # Create a single deterministic RNG and pass it around
     rng = random.Random(master_seed)
 
-    world = GenerateWorld(rng, width=20, height=20, num_continents=10, scale=15)
+    world = GenerateWorld(rng, width=100, height=100, num_continents=10, scale=15)
     world = AssignClimate(world, rng)
     # NEW: compute temperature + rainfall maps (deterministic)
     world = ComputeTemperatureAndRainfall(world, rng)
@@ -144,7 +145,16 @@ def Main():
 
     print("Running 5 in-game days of economy simulation...\n")
     print("Global subscribers:", time_system.subscribers.get("global"))
-    time_system.run(hours=10 * 24)
+
+    # Example usage in Main()
+    # Measure 1 hour of full world simulation
+    seconds_per_hour = MeasureSimulationSpeed(time_system, hours_to_run=24)
+
+    # Estimate how long 24 hours (1 day) will take
+    estimated_day_time = seconds_per_hour * 24
+    print(f"Estimated time for 1 in-game day: {estimated_day_time:.2f} seconds")
+
+    # time_system.run(hours=1 * 1)
     print ("DONE")
 
     meta_tile = world[0][0]

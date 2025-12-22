@@ -5,7 +5,7 @@ from tile_state import TileState
 from worldgen import GetNeighborsRadius
 from math import sqrt
 from resource_catalog import GetResourcesForTile
-
+import time
 SYMBOLS = {
     "plains": "🌿",
     "forest": "🌳",
@@ -259,3 +259,23 @@ def LogEntityEvent(entity, event_type: str, message: str, target_entity=None):
     log_parts.append(f": {message}")
 
     print(" ".join(log_parts))
+
+
+def MeasureSimulationSpeed(time_system, hours_to_run=1):
+    """
+    Calculates the real-world seconds required to run a specific
+    number of in-game hours.
+    """
+    print(f"--- Starting Profiler: Running {hours_to_run} in-game hour(s) ---")
+
+    start_real_time = time.perf_counter()
+
+    # Execute the simulation duration
+    time_system.run(hours=hours_to_run)
+
+    end_real_time = time.perf_counter()
+
+    elapsed_seconds = end_real_time - start_real_time
+    print(f"Result: {hours_to_run} game hour(s) took {elapsed_seconds:.4f} real seconds.")
+
+    return elapsed_seconds
